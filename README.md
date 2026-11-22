@@ -1,0 +1,265 @@
+# Rabbit of Duty 🐰
+
+Ein Ego-Shooter für den Browser, gebaut mit [Three.js](https://threejs.org/). Herzstück ist die Karte **Muchtown**,
+der Ortskern von Much im Bergischen Land: Das Dorf ist aus amtlichen offenen Geodaten nachgebaut, mit echtem Gelände,
+echten Häusern, Luftbild, Bäumen und Straßen. Das Spiel läuft ohne Installation im Browser, auch auf Laptops mit
+integrierter Grafik.
+
+Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
+
+## Was drinsteckt
+
+### Spiel
+
+- **Zwei Modi:**
+  - *Klassisch* gegen Soldaten (Späher, Schwerer Soldat, Sturmsoldat).
+  - *Zombies* (Wilder Zombie, Verwesender Zombie, Gefräßiger Koloss).
+  - Die Gegner kommen in Wellen. Punkte und Combos zählen.
+- **Munitionskisten:** Im Einzelspiel taucht immer wieder eine Kiste in der Nähe auf, erkennbar an einer Lichtsäule
+  und einem gelben Punkt auf dem Radar. Drüberlaufen füllt die Reserve aller Waffen auf und bringt eine Granate.
+- **Bestenliste:** Am Ende einer Runde trägst du dich mit deinem Namen ein, getrennt nach Karte und Modus. Im Menü
+  zeigt **Bestenliste** die besten zehn.
+- **Sieben Karten:** Muchtown (Standard), OpenStreetMap 3D (Potsdamer Platz, Berlin), Dämmerungs-Stadt,
+  Luxus-Atrium, Industrie-Lagerhalle, Wüsten-Außenposten und Nacht-Einsatz.
+- **Neun Waffen und eine Granate:** Ausgewählt werden sie in der Waffenkammer.
+  - Zielen über Kimme und Korn, Rotpunkt oder Zielfernrohr.
+  - Rückstoßmuster, Nachladen mit Animation, Nahkampf.
+- **Bewegung:** sprinten, springen, ducken, hinlegen.
+- **Karte und Navi:** Ziel auf der Karte anklicken, dann der Leuchtlinie am Boden folgen. Die Route führt bevorzugt
+  über Straßen und Wege, mit Abbiegehinweisen und auf Wunsch mit Sprachansage.
+- **Mehrspieler:** 1 gegen 1 im Heimnetz über einen kleinen Server (siehe unten).
+
+### Muchtown: Much als echtes Dorf
+
+- **Gelände** aus dem digitalen Geländemodell DGM1 (1-m-Raster). Spieler, Gegner und Granaten folgen den echten Hügeln.
+- **Häuser** aus dem amtlichen 3D-Gebäudemodell LoD2: echte Grundrisse, Höhen, Dachformen und Hausnummern.
+- **Dächer und Boden** aus dem Luftbild mit 25 cm pro Pixel.
+- **Bäume** an ihren echten Standorten in echter Höhe.
+- **Straßen, Wege und Straßennamen** aus OpenStreetMap.
+- **18 Läden an der Hauptstraße** (Nr. 19 bis 34) haben ihren echten Haustyp und eine gezeichnete Ladenfront mit
+  Schriftzug. Haustypen sind Fachwerk, Schiefer, Putz, Klinker und Naturstein.
+- **Spielfläche** 930 × 540 m. Start ist an der Hauptstraße beim Rathaus.
+
+### Technik
+
+- **Ohne Build-Schritt:** Three.js r183 und reines JavaScript. Three.js liegt im Repo, fürs Einzelspiel ist kein
+  Internet nötig.
+- **Gebaut für schwache Grafikchips:**
+  - Die Auflösung regelt sich nach der gemessenen GPU-Zeit.
+  - Das Gelände liegt in Kacheln mit vier Detailstufen.
+  - Häuser und Bäume sind zu wenigen großen Meshes zusammengefasst.
+  - Alle Ladenfronten teilen sich einen Texturatlas.
+  - Shader werden vorab übersetzt, damit es beim ersten Schuss nicht ruckelt.
+- **Waffen in der Hand:** eigene Szene, Handschuh-Hände und Animationen. Die meisten Waffen sind direkt aus Code
+  gebaut, zwei sind texturierte Modelle aus KI-Generatoren.
+
+### Entstehung
+
+Entwickelt mit Unterstützung von KI-Assistenten: Claude (Anthropic) und Gemini (Google).
+
+## Selbst spielen
+
+Du brauchst einen aktuellen Browser mit WebGL 2 (Chrome, Edge oder Firefox). Für den kleinen lokalen Webserver
+brauchst du außerdem Python 3.
+
+1. Herunterladen:
+
+   ```bash
+   git clone https://github.com/SiriusSagittarius/rabbit-of-duty.git
+   ```
+
+   Oder auf GitHub **Code → Download ZIP** wählen und entpacken.
+2. Im Ordner den Webserver starten:
+
+   ```bash
+   cd rabbit-of-duty
+   python -m http.server 8080 --bind 127.0.0.1
+   ```
+
+   Ein Doppelklick auf `index.html` reicht nicht, weil Browser die Spielmodule nur über HTTP laden.
+3. Im Browser <http://localhost:8080> öffnen, Karte und Modus wählen und auf den Startbildschirm klicken.
+   Der Klick fängt die Maus ein, `Esc` gibt sie wieder frei.
+
+Das Zombie-Modell ist nicht im Repo, weil seine Lizenz kein Hochladen erlaubt. Ohne das Modell erscheinen einfache
+Ersatz-Zombies. Wie du das echte Modell einrichtest, steht unter [Zombie-Modell einrichten](#zombie-modell-einrichten).
+
+### Mehrspieler und Bestenliste (optional)
+
+Beides läuft über denselben kleinen Server. Dafür brauchst du zusätzlich Node.js 22 oder neuer. Für den Mehrspieler
+ist außerdem Internet nötig, weil die Client-Bibliothek von esm.sh geladen wird.
+
+```bash
+cd server
+npm install
+npm start          # Server auf Port 2567: Mehrspieler und Bestenliste
+```
+
+Die Bestenliste speichert der Server in `server/data/highscores.json`. Läuft kein Server, zeigt das Spiel nur deinen
+eigenen Rekord.
+
+- **Webserver:** Starte ihn dafür ohne `--bind 127.0.0.1`, damit er im Heimnetz erreichbar ist. Mach das nur in
+  einem vertrauenswürdigen Netz.
+- **Spiel öffnen:** Alle öffnen das Spiel über die IP-Adresse des Rechners, auf dem der Server läuft, zum Beispiel
+  `http://192.168.178.20:8080`, und wählen **Mehrspieler (LAN)**.
+- **Server auf einem anderen Rechner:** Hänge `?server=ws://adresse:2567` an die Adresse des Spiels.
+
+## Steuerung
+
+| Taste | Aktion |
+|---|---|
+| W A S D | bewegen |
+| Maus | umsehen |
+| Linksklick | schießen |
+| Rechtsklick | zielen |
+| R | nachladen |
+| Shift | sprinten |
+| Leertaste | springen |
+| C | ducken |
+| X | hinlegen |
+| 1 / 2 / Mausrad | Waffe wechseln (Primär / Sekundär) |
+| E oder V | Nahkampf (Messer bzw. Stoß mit der Waffe) |
+| G | Granate werfen |
+| N oder Tab | Karte und Navi |
+| M | Musik an oder aus |
+| Esc | Pause |
+
+## Projektaufbau
+
+| Pfad | Inhalt |
+|---|---|
+| `index.html` | Ladefenster, Menüs, HUD und Styles |
+| `src/main.js` | Spiellogik: Renderer, Karten, Spieler, Gegner, Wellen, HUD, Mehrspieler-Anbindung |
+| `src/arsenal.js` | Waffenliste, Feuermodi, Rückstoß, Nachladen, Nahkampf, Granate |
+| `src/weapons/` | Waffen in der Hand: Hände, Animationen, Materialien und Modelle (`models/`) |
+| `src/osm-level.js`, `src/nrw-level.js` | Kulissen aus OpenStreetMap und aus den NRW-Geodaten |
+| `src/much-shops.js` | Ladenfronten an der Hauptstraße in Much |
+| `src/navmap.js` | Karte und Navi |
+| `src/zombie-pak.js` | öffnet das verschlüsselte Zombie-Paket |
+| `src/pickups.js` | Munitionskisten |
+| `src/highscore.js` | Bestenliste: Abruf und Eintragen beim Server |
+| `src/music.js`, `audio/` | Musik und Soundeffekte |
+| `src/net.js`, `server/` | Mehrspieler mit Colyseus und die Bestenliste (`server/src/highscores.ts`) |
+| `assets/` | Kartendaten (`nrw/`, `osm/`), Modelle und Sounds |
+| `ui/` | Vorschaubilder der Karten |
+| `tools/` | Werkzeuge für Kartendaten, Sounds und das Zombie-Modell (Python, Packen mit Node) |
+| `vendor/three/` | Three.js |
+
+## Erweitern
+
+### Weitere Orte
+
+Einen Ort aus OpenStreetMap holen. Die Koordinaten bekommst du auf openstreetmap.org mit Rechtsklick → „Adresse anzeigen“:
+
+```bash
+python tools/osm_fetch.py meinort 50.9052 7.4079 --radius 380
+```
+
+Danach den ausgegebenen Eintrag in `src/osm-level.js` unter `OSM_LOCATIONS` ergänzen und in `src/main.js` eine
+Karte in `MAP_CONFIGS` anlegen.
+
+Für Orte in Nordrhein-Westfalen holt `tools/nrw_fetch.py` zusätzlich Gelände, Häuser und Luftbild.
+Dafür braucht Python die Pakete numpy und Pillow.
+
+```bash
+python tools/nrw_fetch.py much 50.904981 7.402773 --radius 640 --terrain 720 --near 512
+```
+
+### Eigene Waffen
+
+- **Als Code-Modell:** eine Datei in `src/weapons/models/` (Vorlage: `rifle.js`) und dazu ein Eintrag in `CATALOG`
+  in `src/arsenal.js`.
+- **Als fertiges GLB-Modell,** etwa aus Tripo oder Meshy: Erst verkleinern, dann wie `ak_tripo` oder `pistol_meshy`
+  in `CATALOG` eintragen.
+
+```bash
+npx @gltf-transform/cli optimize roh.glb assets/models/weapons/neu.glb --compress false \
+  --texture-compress webp --texture-size 1024 --simplify-ratio 0.02 --simplify-error 0.004 --join false
+```
+
+### Ladenfronten
+
+In `src/much-shops.js` steht je Adresse ein Eintrag mit Haustyp, Farbe und einer Funktion, die die Front zeichnet.
+Es gibt vier Zusatzoptionen:
+
+| Option | Wirkung |
+|---|---|
+| `face` | Himmelsrichtung der Front, wenn der Laden nicht zur Straße zeigt |
+| `near` | wählt die richtige Wand, wenn ein Haus mehrere Straßenseiten hat |
+| `more` | weitere Fronten am selben Haus |
+| `full` | Bild über die ganze Wand bis in den Giebel |
+
+## Zombie-Modell einrichten
+
+Das animierte Zombie-Modell hat 12 Animationen und 3 Hautvarianten. Seine Lizenz erlaubt die Nutzung im Spiel,
+aber kein erneutes Hochladen. Außerdem verlangt CGTrader angemessene Maßnahmen, damit Spieler das Modell nicht als
+Datei herausholen können. Das Spiel lädt es deshalb nur aus einem verschlüsselten Paket (ChaCha20), das es erst im
+Arbeitsspeicher öffnet. Weder das Modell noch das Paket noch der Schlüssel liegen im Repo, du richtest es so ein:
+
+1. **Herunterladen:** „Zombie free VR / AR / low-poly“ von dremorn, kostenlos auf CGTrader (Konto nötig):
+   <https://www.cgtrader.com/free-3d-models/character/fantasy-character/zombie-79f78dd5-e3c9-44d2-a9e4-9530f9139426>
+2. **Entpacken:** die Archive nach `images/net/`, sodass dort die Ordner `Base+mesh/`, `Texture+set+1/` bis
+   `Texture+set+3/` und `Zombie+animation/` liegen.
+3. **Texturen verkleinern** (braucht Python mit Pillow):
+
+   ```bash
+   python tools/zombie_textures.py        # schreibt images/net/build/*.webp
+   ```
+
+4. **Modell umwandeln:**
+   - Den Webserver starten und <http://localhost:8080/tools/zombie_convert.html> öffnen.
+   - Auf **„zombie.glb herunterladen“** klicken.
+   - Die Datei als `images/net/build/zombie.glb` speichern.
+5. **Verschlüsselt packen** (braucht Node.js 22 oder neuer):
+
+   ```bash
+   node tools/zombie_pack.mjs             # schreibt assets/models/zombie/zombie.pak und zombie.key
+   ```
+
+6. **Ausprobieren:** das Spiel mit Strg + F5 neu laden und den Modus „Zombies“ wählen.
+
+Auf einen Webserver gehören nur `assets/models/zombie/zombie.pak` und `zombie.key`, nie die Einzeldateien aus
+`images/net/build/`. Der Schlüssel wird bei jedem Packen neu gewürfelt, lade also immer beide Dateien zusammen hoch.
+
+## Quellen, Lizenzen und Namensnennung
+
+| Bestandteil | Herkunft und Lizenz | Im Repo |
+|---|---|---|
+| Three.js (`vendor/three/`) | © three.js authors, MIT | ja |
+| Waffen-System, Hände, Gewehr, MP und Pistole (`src/weapons/`) | © 2026 mshumer, MIT (siehe `src/weapons/LICENSE`) | ja |
+| Scharfschützengewehr, Sturmgewehr, Bullpup, Messer und Granate (`src/weapons/models/`) | eigene Code-Modelle, Entwürfe mit Gemini, danach überarbeitet | ja |
+| Taiga-47 (`assets/models/weapons/ak_tripo.glb`) | eigene Generierung mit Tripo (Pro-Konto) | ja |
+| Vintage 9 (`assets/models/weapons/pistol_meshy.glb`) | eigene Generierung mit Meshy (bezahlter Tarif, Rechte beim Ersteller) | ja |
+| Gelände, Gebäude, Hausnummern, Luftbild und Baumhöhen (`assets/nrw/`) | Geobasis NRW, [Datenlizenz Deutschland – Zero – 2.0](https://www.govdata.de/dl-de/zero-2-0) | ja |
+| Straßen und Wege (`assets/osm/`) | © [OpenStreetMap-Mitwirkende](https://www.openstreetmap.org/copyright), ODbL 1.0 | ja |
+| Soldaten-Figur (`assets/models/soldier/Soldier.glb`) | aus den three.js-Beispielen, ursprünglich Mixamo (Adobe); nur im Spiel, nicht einzeln zum Download | ja |
+| Spielmusik (`audio/hauptspiel.wav`) | Ausschnitt aus „Del Rio Bravo“ von Kevin MacLeod, CC BY 3.0 (Hinweis siehe unten) | ja |
+| Menümusik (`audio/astronaut12-…-301131.mp3`) | „Energy Gaming Electro Trap …“ von astronaut12, Pixabay Content License | ja |
+| Sprung-Sound (`assets/audio/jump.mp3`) | Pixabay Content License | ja |
+| Soundeffekte (`audio/free/`, `audio/sfx/`) | freesound.org, CC0, plus eigene Synthese; Liste mit Links in `audio/free/text.md` und `audio/sfx/QUELLEN.txt` | ja |
+| Mehrspieler (`server/`, Client von esm.sh) | Colyseus, MIT | Server ja |
+| Zombie-Modell | „Zombie free VR / AR / low-poly“ von dremorn (CGTrader), Royalty Free License | nein, selbst laden |
+
+**Musik:** „Del Rio Bravo“ Kevin MacLeod ([incompetech.com](https://incompetech.com/)),
+Licensed under Creative Commons: By Attribution 3.0, <https://creativecommons.org/licenses/by/3.0/>
+
+**Kartendaten:** Die Hinweise zu Geobasis NRW und OpenStreetMap blendet das Spiel auf den Karten selbst ein.
+
+## Hinweise
+
+- **Echte Orte und Läden:** Much und seine Geschäfte gibt es wirklich.
+  - Die Ladenfronten sind gezeichnete Nachbildungen. Namen und Schriftzüge erscheinen nur als Teil des
+    Straßenbilds, damit man die Orte wiedererkennt.
+  - Es besteht keine Zusammenarbeit mit den Geschäften, der Gemeinde Much oder der Kreissparkasse. Niemand hat das
+    Projekt beauftragt, gefördert oder bezahlt.
+  - Marken und Logos gehören ihren Inhabern. Wer als Geschäft nicht im Spiel erscheinen möchte, meldet sich bitte
+    über ein GitHub-Issue, dann nehme ich die Front heraus.
+- **Keine fremden Fotos:** Fassaden und Schilder sind aus Code gezeichnet.
+- **Erfundene Waffennamen:** Die Bauweise orientiert sich an echten Waffentypen, bildet aber kein bestimmtes
+  Markenprodukt nach.
+- **Kein Bezug zu Call of Duty:** Der Name ist ein Wortspiel. Das Spiel hat nichts mit Activision oder
+  „Call of Duty“ zu tun.
+
+## Lizenz
+
+Für den eigenen Code dieses Projekts ist noch keine Open-Source-Lizenz festgelegt. Fremde Bestandteile stehen
+unter den Lizenzen in der Tabelle oben.

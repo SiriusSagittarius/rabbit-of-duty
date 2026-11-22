@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Rabbit of Duty</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --accent: #ff8a3d;        /* Karotten-Orange */
+      --accent-2: #ffd24a;      /* Gold */
+      --mint: #7ef0c0;
+      --ink: #e9eef2;
+      --muted: #93a0aa;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; }
+    body { font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: var(--ink); }
+    #game { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: none;
+      filter: contrast(1.07) saturate(1.13) brightness(1.02); }  /* billiger "Grade"-Look */
+
+    /* ---------- Overlays (Layer über dem Canvas) ---------- */
+    .overlay { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1.1rem; text-align: center; }
+
+    /* ---------- Ladefenster (Boot) ---------- */
+    #boot { z-index: 100;
+      background: radial-gradient(120% 120% at 50% 35%, #16202a 0%, #0a1016 60%, #05070a 100%);
+      transition: opacity .6s ease; }
+    #boot.hide { opacity: 0; pointer-events: none; }
+    #boot-title { font-size: clamp(2rem, 6vw, 3.6rem); font-weight: 900; letter-spacing: .22em;
+      text-shadow: 0 4px 30px rgba(0,0,0,.6); }
+    #boot-title span { color: var(--accent); }
+    #boot-sub { font-size: .74rem; text-transform: uppercase; letter-spacing: .5em; color: var(--muted); }
+    #boot-emblem { font-size: 2.4rem; filter: drop-shadow(0 2px 10px rgba(255,138,61,.4)); }
+    #boot-track { width: min(440px, 66vw); height: 5px; border-radius: 5px;
+      background: rgba(255,255,255,.08); overflow: hidden; }
+    #boot-bar { height: 100%; width: 0%; border-radius: 5px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .35s ease; }
+    #boot-status { font-size: .8rem; letter-spacing: .06em; color: var(--muted); min-height: 1.1em;
+      font-variant-numeric: tabular-nums; }
+    #boot-tip { position: fixed; bottom: 1.6rem; font-size: .7rem; color: #5b636b; letter-spacing: .08em; }
+
+    /* ---------- Start / Game-Over ---------- */
+    #start .big, #gameover .big { font-size: clamp(1.6rem,4vw,2.4rem); font-weight: 800; letter-spacing: .06em; }
+    #start .hint, #gameover .hint { color: var(--muted); font-size: .95rem; }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+    #gameover { background: rgba(8,4,4,.62); }
+    #gameover .big { color: #ff5b5b; }
+    #gameover .score { font: 800 1.5rem/1.2 "Courier New", monospace; color: #fff; }
+    #gameover .rec { color: var(--accent-2); font-size: 1rem; }
+
+    /* ---------- Buttons ---------- */
+    .btn { min-width: 260px; padding: 12px 22px; font-size: 1.02rem; font-weight: 700;
+      cursor: pointer; border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05); color: var(--ink); transition: .15s; letter-spacing: .02em; }
+    .btn:hover { background: rgba(255,138,61,.16); border-color: var(--accent); transform: translateY(-1px); }
+    .btn.primary { background: linear-gradient(90deg, rgba(255,138,61,.9), rgba(255,210,74,.9)); color: #201200; border: none; }
+    .btn.primary:hover { filter: brightness(1.08); }
+
+    /* ---------- Pause-Menü ---------- */
+    #pause { background: rgba(6,10,14,.72); backdrop-filter: blur(3px); }
+    #pause .title { font-size: 1.05rem; letter-spacing: .5em; color: var(--muted); text-transform: uppercase; }
+    #pause .title b { color: var(--accent); }
+    #pause .paused { font-size: 2.2rem; font-weight: 900; letter-spacing: .14em; }
+    .ctrlGrid { display: grid; grid-template-columns: auto auto; gap: 8px 30px; font-size: .98rem;
+      margin: 6px auto 10px; text-align: left; }
+    .ctrlGrid span { color: var(--muted); }
+    .ctrlGrid b { text-align: right; color: var(--accent-2); white-space: nowrap; }
+
+    /* ---------- HUD ---------- */
+    #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+    #crosshair { position: absolute; top: 50%; left: 50%; width: 22px; height: 22px;
+      transform: translate(-50%,-50%); transition: opacity .12s; }
+    #crosshair.ads { opacity: 0; }   /* beim Zielen übernimmt der Rotpunkt der Optik */
+    #crosshair::before, #crosshair::after { content:""; position:absolute; background: rgba(255,255,255,.85);
+      box-shadow: 0 0 4px rgba(0,0,0,.7); }
+    #crosshair::before { left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
+    #crosshair::after  { top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); }
+    #crosshair .dot { position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%;
+      background:#fff; transform:translate(-50%,-50%); }
+    #hitmarker { position:absolute; top:50%; left:50%; width:26px; height:26px; transform:translate(-50%,-50%) rotate(45deg);
+      opacity:0; }
+    #hitmarker::before,#hitmarker::after{content:"";position:absolute;background:#fff;}
+    #hitmarker::before{left:50%;top:0;width:2px;height:100%;transform:translateX(-50%);}
+    #hitmarker::after{top:50%;left:0;height:2px;width:100%;transform:translateY(-50%);}
+    #hitmarker.show{animation:hm .28s ease-out;}
+    @keyframes hm{0%{opacity:1;transform:translate(-50%,-50%) rotate(45deg) scale(.5)}100%{opacity:0;transform:translate(-50%,-50%) rotate(45deg) scale(1.3)}}
+
+    #topleft { position:absolute; top:14px; left:16px; font-family:"Courier New",monospace; }
+    #score { font-size: 34px; font-weight: 800; text-shadow: 0 0 12px rgba(255,138,61,.6); }
+    #combo { font-size: 16px; font-weight: 800; color: var(--accent-2); opacity: 0; transition: opacity .15s; }
+    #combo.on { opacity: 1; }
+
+    #botbar { position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+      display:flex; align-items:flex-end; gap:26px; font-family:"Courier New",monospace; }
+    .stat { text-align:center; }
+    .stat .num { font-size: 30px; font-weight: 800; line-height:1; }
+    .stat .lbl { font-size: 11px; letter-spacing:.14em; color: var(--muted); text-transform:uppercase; }
+    #health .num { color: var(--mint); } #healthWrap { position:relative; }
+    #healthTrack { width: 220px; height: 10px; border-radius: 6px; background: rgba(255,255,255,.1); overflow:hidden; margin-top:4px;}
+    #healthFill { height:100%; width:100%; background: linear-gradient(90deg,#3ad07f,#7ef0c0); transition: width .18s; }
+    #ammo .num { color: var(--accent-2); } #ammo .num small{ font-size:16px; color:var(--muted);}
+    #wave .num { color: var(--accent); }
+
+    #reloadHint { position:absolute; top:57%; left:50%; transform:translateX(-50%);
+      color:#ff5b5b; font:800 20px "Courier New",monospace; opacity:0; }
+    #reloadHint.on { opacity:1; animation: blink .6s infinite alternate; }
+    @keyframes blink { from{opacity:1} to{opacity:.25} }
+
+    #banner { position:absolute; top:26%; left:50%; transform:translate(-50%,-50%);
+      font:900 54px "Courier New",monospace; color: var(--accent); text-shadow:0 0 26px rgba(255,138,61,.7);
+      letter-spacing:6px; opacity:0; white-space:nowrap; }
+    #banner.show { animation: bannerIn 2s ease-out; }
+    @keyframes bannerIn {0%{opacity:0;transform:translate(-50%,-50%) scale(2)}14%{opacity:1;transform:translate(-50%,-50%) scale(1)}72%{opacity:1}100%{opacity:0}}
+
+    #damageFlash { position:absolute; inset:0; pointer-events:none;
+      background: radial-gradient(ellipse at center, transparent 42%, rgba(220,20,20,.55) 100%); opacity:0; }
+    #popups { position:absolute; inset:0; overflow:hidden; }
+    .pop { position:absolute; font:800 24px "Courier New",monospace; text-shadow:0 0 8px currentColor;
+      animation: popFloat .9s ease-out forwards; }
+    @keyframes popFloat {0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-70px) scale(1.35)}}
+    #vignette { position:absolute; inset:0; pointer-events:none;
+      box-shadow: inset 0 0 260px 70px rgba(0,0,0,.62);
+      background: radial-gradient(120% 120% at 50% 46%, transparent 55%, rgba(0,0,0,.32) 100%); }
+    .shake { animation: shake .3s; }
+    @keyframes shake {0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,4px)}40%{transform:translate(6px,-5px)}60%{transform:translate(-4px,6px)}80%{transform:translate(4px,-4px)}}
+    /* Karte & Navi (src/navmap.js) */
+    #navMap { display: none; position: fixed; inset: 0; z-index: 60; background: rgba(4,8,12,0.92); cursor: crosshair; }
+    #navMapCanvas { position: absolute; inset: 56px 18px 40px 18px; width: calc(100% - 36px); height: calc(100% - 96px);
+      border: 1px solid rgba(126,240,192,0.35); border-radius: 10px; box-shadow: 0 0 40px rgba(0,0,0,0.6); }
+    #navMap .nm-top { position: absolute; top: 12px; left: 18px; right: 18px; display: flex; align-items: center; gap: 12px;
+      font: 600 13px "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+    #navMap .nm-top b { color: var(--mint); letter-spacing: 3px; font-size: 16px; }
+    #navMap .nm-top span { flex: 1; color: var(--muted); }
+    #navMap .nm-top button { cursor: pointer; padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(126,240,192,0.45);
+      background: rgba(8,14,20,0.9); color: var(--mint); font: 700 12px "Segoe UI", system-ui, sans-serif; }
+    #navMap .nm-help { position: absolute; bottom: 12px; left: 18px; right: 18px; text-align: center; color: var(--muted);
+      font: 12px "Segoe UI", system-ui, sans-serif; }
+    #navHud { display: none; position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 15; align-items: center; gap: 12px;
+      padding: 8px 16px 8px 12px; border-radius: 10px; background: rgba(6,12,18,0.82); border: 1px solid rgba(60,242,255,0.55);
+      box-shadow: 0 0 18px rgba(60,242,255,0.25); pointer-events: none; }
+    #navHud .nh-arrow { width: 34px; height: 34px; display: grid; place-items: center; font-size: 26px; color: #3cf2ff;
+      text-shadow: 0 0 8px rgba(60,242,255,0.8); }
+    #navHud .nh-arrow { transform-origin: 50% 50%; }
+    #navHud .nh-col { display: flex; flex-direction: column; line-height: 1.15; }
+    #navHud .nh-text { font: 800 16px "Segoe UI", system-ui, sans-serif; color: #e9fbff; }
+    #navHud .nh-dist { font: 600 12px "Segoe UI", system-ui, sans-serif; color: #8fe9f5; }
+    /* Bestenliste (Spielende + Menü) */
+    .hs-box{width:min(460px,92vw);margin:10px auto 0;padding:12px 14px;background:rgba(10,14,20,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;text-align:left}
+    .hs-title{font-size:12px;font-weight:900;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+    .hs-form{display:flex;gap:8px;margin-bottom:8px}
+    .hs-form input{flex:1;min-width:0;padding:8px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.25);background:#0b1016;color:var(--ink);font:inherit;font-size:14px}
+    .hs-form .btn{min-width:auto;padding:8px 14px}
+    .hs-list{list-style:none;margin:0;padding:0;font-size:13px;max-height:34vh;overflow-y:auto;text-align:left}
+    .hs-list li{display:grid;grid-template-columns:2.2em 1fr auto;column-gap:8px;padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--ink)}
+    .hs-list li .r{color:var(--muted);text-align:right}
+    .hs-list li .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+    .hs-list li .s{color:var(--mint);font-weight:800;font-variant-numeric:tabular-nums}
+    .hs-list li .i{grid-column:2 / 4;font-size:11px;color:var(--muted)}
+    .hs-list li.me{background:rgba(255,138,61,.18);border-radius:4px}
+    .hs-list li.empty{display:block;color:var(--muted);border:none}
+    .hs-msg{font-size:12px;color:var(--muted);min-height:16px;margin-top:6px}
+    .hs-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media (max-width:640px){.hs-cols{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="vignette"></div>
+
+    <!-- Sniper Scope Visier / Fernrohr (beim Zielen mit Scharfschützengewehren) -->
+    <div id="sniperScope" style="position:fixed;inset:0;pointer-events:none;z-index:18;display:none;align-items:center;justify-content:center;overflow:hidden;">
+      <!-- Das kreisrunde Visier mit unendlichem Schwarz-Schatten außen herum -->
+      <div style="position:relative;width:min(86vh, 86vw);height:min(86vh, 86vw);border-radius:50%;box-shadow:0 0 0 9999px #000;display:flex;align-items:center;justify-content:center;">
+        <img id="sniperScopeImg" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="Sniper Scope" style="position:absolute;width:108%;height:108%;object-fit:cover;pointer-events:none;" />
+        <!-- Taktisches Fadenkreuz & Leuchtpunkt -->
+        <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;">
+          <!-- Horizontale Haarlinie -->
+          <div style="position:absolute;width:100%;height:2px;background:linear-gradient(90deg, rgba(15,15,15,0.95) 0%, rgba(15,15,15,0.95) 45%, transparent 45%, transparent 55%, rgba(15,15,15,0.95) 55%, rgba(15,15,15,0.95) 100%);"></div>
+          <div style="position:absolute;width:100%;height:1px;background:rgba(0,0,0,0.7);"></div>
+          <!-- Vertikale Haarlinie -->
+          <div style="position:absolute;height:100%;width:2px;background:linear-gradient(180deg, rgba(15,15,15,0.95) 0%, rgba(15,15,15,0.95) 45%, transparent 45%, transparent 55%, rgba(15,15,15,0.95) 55%, rgba(15,15,15,0.95) 100%);"></div>
+          <div style="position:absolute;height:100%;width:1px;background:rgba(0,0,0,0.7);"></div>
+          <!-- Mildot Distanz-Kreis -->
+          <div style="position:absolute;width:140px;height:140px;border:1px dashed rgba(20,20,20,0.45);border-radius:50%;"></div>
+          <!-- Roter Leuchtpunkt im Fadenkreuz-Zentrum -->
+          <div style="position:absolute;width:6px;height:6px;border-radius:50%;background:#ff2222;box-shadow:0 0 5px #ff0000, 0 0 10px rgba(255,30,30,0.8);"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="crosshair"><div class="dot"></div></div>
+    <div id="hitmarker"></div>
+    <div id="topleft">
+      <div id="score">0</div>
+      <div id="combo">COMBO x1</div>
+      <div id="frags" style="font-size:16px;font-weight:800;color:#ffdd44;margin-top:6px;display:flex;align-items:center;gap:6px">
+        <span id="fragsIcon">💀</span>
+        <span id="fragsLabel">KILLS:</span>
+        <span id="fragsNum" style="font-size:22px;color:#fff;background:rgba(255,221,68,0.22);padding:1px 8px;border-radius:4px;border:1px solid rgba(255,221,68,0.5);font-family:monospace;">0</span>
+      </div>
+    </div>
+
+    <!-- Taktisches Map-Radar (UAV) -->
+    <div id="radarContainer" style="position:fixed;top:18px;right:20px;width:150px;height:150px;z-index:15;pointer-events:none;border-radius:50%;border:2px solid rgba(126,240,192,0.6);box-shadow:0 0 20px rgba(0,0,0,0.85), inset 0 0 15px rgba(126,240,192,0.18);background:radial-gradient(circle, rgba(14,24,28,0.92) 0%, rgba(6,12,16,0.97) 100%);overflow:hidden;">
+      <canvas id="radarCanvas" width="150" height="150" style="display:block;width:100%;height:100%;"></canvas>
+      <div style="position:absolute;top:3px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:900;color:rgba(126,240,192,0.8);letter-spacing:1px;text-shadow:0 0 4px #7ef0c0;">N</div>
+      <div id="radarModeBadge" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:1px;text-transform:uppercase;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:3px;">RADAR</div>
+    </div>
+    <!-- Schneller Musik-Schalter auf dem HUD -->
+    <button id="hudMusicBtn" style="pointer-events:auto;position:fixed;top:178px;right:20px;padding:5px 12px;font-size:11px;font-weight:700;border-radius:6px;background:rgba(8,14,20,0.85);border:1px solid rgba(126,240,192,0.5);color:#7ef0c0;cursor:pointer;backdrop-filter:blur(6px);z-index:20;display:flex;align-items:center;gap:6px;transition:all 0.15s ease;">
+      <span>🎵</span> <span id="hudMusicText">Musik: AN</span>
+    </button>
+    <div id="reloadHint">[R] NACHLADEN</div>
+    <div id="banner"></div>
+    <div id="damageFlash"></div>
+    <div id="popups"></div>
+    <div id="botbar">
+      <div class="stat" id="wave"><div class="num">1</div><div class="lbl">Welle</div></div>
+      <div class="stat" id="weaponWrap"><div class="num" id="weaponName" style="color:#7ef0c0;font-size:22px;letter-spacing:1px">RK-4 Karabiner</div><div class="lbl" style="font-size:10px">[1][2][3] Waffe</div></div>
+      <div class="stat" id="healthWrap"><div class="num" id="health"><span id="healthNum">100</span></div><div id="healthTrack"><div id="healthFill"></div></div><div class="lbl">Leben</div></div>
+      <div class="stat" id="ammo"><div class="num"><span id="ammoNum">30</span><small>/<span id="ammoRes">120</span></small></div><div class="lbl">Munition</div></div>
+      <div class="stat" id="stanceWrap" style="cursor:pointer;" title="Körperhaltung wechseln: [C] Ducken · [X] Hinlegen"><div class="num" id="stanceIcon" style="font-size:22px">🧍</div><div class="lbl" id="stanceLabel">[C] Ducken · [X] Liegen</div></div>
+      <div class="stat" id="equipWrap"><div class="num" id="grenadeNum" style="color:#ff8a3d;font-size:22px">💣 3</div><div class="lbl" style="font-size:10px">[G] Granate · [E] Messer</div></div>
+    </div>
+  </div>
+
+  <!-- Start -->
+  <div id="start" class="overlay" style="display:none">
+    <div class="big">🐰 RABBIT OF DUTY</div>
+    <div class="hint pulse">Klicken zum Einsatz (Solo) — Maus wird eingefangen</div>
+
+    <!-- Modus-Wahl: Söldner vs Zombie-Überleben -->
+    <div style="margin:14px 0 10px 0;display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.65);font-weight:800;">⚔️ SPIELMODUS WÄHLEN</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+        <button class="btn mode-btn" id="modeClassicBtn" style="min-width:180px;padding:12px 18px;border:2px solid #7ef0c0;background:rgba(26,54,46,0.9);color:#fff;font-weight:800;border-radius:8px;cursor:pointer;text-align:center;box-shadow:0 0 14px rgba(126,240,192,0.3);">
+          🛡️ KLASSISCH: SÖLDNER<br><span style="font-size:11px;font-weight:400;opacity:0.85;">Taktische Feuergefechte</span>
+        </button>
+        <button class="btn mode-btn" id="modeZombiesBtn" style="min-width:180px;padding:12px 18px;border:2px solid rgba(255,77,109,0.4);background:rgba(30,12,18,0.8);color:#fff;font-weight:800;border-radius:8px;cursor:pointer;text-align:center;">
+          🧟 ZOMBIE-ÜBERLEBEN<br><span style="font-size:11px;font-weight:400;opacity:0.85;">Gefräßige Horden abwehren</span>
+        </button>
+      </div>
+      <div id="modeDescription" style="font-size:12px;color:#7ef0c0;font-weight:600;min-height:18px;">🛡️ Taktischer Modus: Söldner mit Sturmgewehren & Deckung.</div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn primary" id="soloPlayBtn">▶ Solo Starten</button>
+      <button class="btn" id="armoryBtn">⚔️ Waffenkammer</button>
+      <button class="btn" id="mapSelectBtn">🗺️ Karte wählen</button>
+      <button class="btn" id="hsBtn">🏆 Bestenliste</button>
+      <button class="btn" id="startMusicBtn">🎵 Musik: AN</button>
+    </div>
+    <button class="btn" id="mpBtn" style="margin-top:8px">🌐 Mehrspieler (LAN)</button>
+    <div class="hint" id="mpStatus" style="color:var(--accent-2)"></div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay" style="display:none">
+    <div class="title">🐰 RABBIT <b>OF DUTY</b></div>
+    <div class="paused">PAUSE</div>
+    <div id="pauseButtons">
+      <button class="btn primary" data-act="resume">▶ Weiter spielen</button>
+      <button class="btn" id="pauseModeBtn">🎮 Modus wechseln</button>
+      <button class="btn" id="pauseArmoryBtn">⚔️ Waffenkammer</button>
+      <button class="btn" id="pauseMapBtn">🗺️ Karte wählen</button>
+      <button class="btn" data-act="controls">🎮 Steuerung anzeigen</button>
+      <button class="btn" id="pauseMusicBtn" data-act="music">🎵 Musik: AN</button>
+      <button class="btn" data-act="mute">🔊 Sound-FX: AN</button>
+      <button class="btn" data-act="quit">✖ Beenden</button>
+    </div>
+    <div id="pauseControls" style="display:none">
+      <div class="ctrlGrid">
+        <span>Bewegen</span><b>W A S D</b>
+        <span>Umsehen</span><b>Maus</b>
+        <span>Schießen</span><b>Linksklick</b>
+        <span>Zielen</span><b>Rechtsklick</b>
+        <span>Waffe wechseln</span><b>1 / 2 / Rad</b>
+        <span>Granate</span><b>G</b>
+        <span>Nahkampf</span><b>E</b>
+        <span>Nachladen</span><b>R</b>
+        <span>Sprinten</span><b>Shift</b>
+        <span>Springen</span><b>Leertaste</b>
+        <span>Ducken</span><b>C / Strg</b>
+        <span>Hinlegen</span><b>X / Y</b>
+        <span>Pause</span><b>ESC</b>
+        <span>Musik an/aus</span><b>M</b>
+        <span>Karte &amp; Navi</span><b>N / Tab</b>
+      </div>
+      <button class="btn" data-act="back">◀ Zurück</button>
+    </div>
+  </div>
+
+  <!-- Waffenkammer Modal -->
+  <div id="armoryModal" class="overlay" style="display:none;background:rgba(6,9,14,0.94);backdrop-filter:blur(8px);z-index:60">
+    <div style="max-width:920px;width:94%;max-height:88vh;display:flex;flex-direction:column;gap:14px;background:#111720;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,0.85);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px">
+        <div style="font-size:1.35rem;font-weight:900;letter-spacing:1.5px;color:var(--accent)">⚔️ WAFFENKAMMER <span style="font-size:0.95rem;color:var(--muted);font-weight:500">(18 WAFFEN & NAHKAMPF)</span></div>
+        <button class="btn" id="armoryCloseBtn" style="min-width:auto;padding:6px 14px">✕ Schließen</button>
+      </div>
+
+      <div style="display:flex;gap:10px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px">
+        <button class="tab-btn active" id="tabPrimary" style="padding:8px 18px;border-radius:6px;border:none;background:var(--accent);color:#100b00;font-weight:800;cursor:pointer">Primärwaffen</button>
+        <button class="tab-btn" id="tabSecondary" style="padding:8px 18px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:var(--ink);font-weight:700;cursor:pointer">Sekundär & Nahkampf</button>
+        <button class="tab-btn" id="tabCamo" style="display:none;padding:8px 18px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:var(--ink);font-weight:700;cursor:pointer">Tarnungen (Camos)</button>
+      </div>
+
+      <div id="armoryGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:12px;overflow-y:auto;padding-right:6px;max-height:55vh">
+        <!-- Dynamisch befüllt -->
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px">
+        <div id="armoryStatus" style="font-size:0.95rem;color:var(--mint);font-weight:700">Ausrüstung: RK-4 Karabiner & P-19</div>
+        <button class="btn primary" id="armoryEquipBtn" style="min-width:180px">Ausrüsten & Spielen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kartenauswahl Modal -->
+  <div id="mapModal" class="overlay" style="display:none;background:rgba(6,9,14,0.94);backdrop-filter:blur(8px);z-index:60">
+    <div style="max-width:920px;width:94%;max-height:88vh;display:flex;flex-direction:column;gap:14px;background:#111720;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,0.85);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px">
+        <div style="font-size:1.35rem;font-weight:900;letter-spacing:1.5px;color:var(--accent)">🗺️ KARTENAUSWAHL <span style="font-size:0.95rem;color:var(--muted);font-weight:500">(7 EINSATZGEBIETE)</span></div>
+        <button class="btn" id="mapCloseBtn" style="min-width:auto;padding:6px 14px">✕ Schließen</button>
+      </div>
+
+      <div id="mapGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:14px;overflow-y:auto;padding-right:6px;max-height:55vh">
+        <!-- Dynamisch befüllt -->
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px">
+        <div id="mapStatus" style="font-size:0.95rem;color:var(--mint);font-weight:700">Ausgewählte Karte: Muchtown</div>
+        <button class="btn primary" id="mapSelectConfirmBtn" style="min-width:180px">Karte Laden & Spielen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bestenliste (aus dem Startmenü) -->
+  <div id="hsModal" class="overlay" style="display:none;background:rgba(6,9,14,0.94);backdrop-filter:blur(8px);z-index:60">
+    <div style="max-width:760px;width:94%;max-height:88vh;display:flex;flex-direction:column;gap:12px;background:#111720;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,0.85);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px">
+        <div style="font-size:1.35rem;font-weight:900;letter-spacing:1.5px;color:var(--accent)">🏆 BESTENLISTE <span id="hsModalMap" style="font-size:0.95rem;color:var(--muted);font-weight:500"></span></div>
+        <button class="btn" id="hsCloseBtn" style="min-width:auto;padding:6px 14px">✕ Schließen</button>
+      </div>
+      <div class="hs-cols">
+        <div><div class="hs-title">🛡️ Söldner</div><ol class="hs-list" id="hsListClassic"></ol></div>
+        <div><div class="hs-title">🧟 Zombies</div><ol class="hs-list" id="hsListZombies"></ol></div>
+      </div>
+      <div class="hs-msg" id="hsModalMsg"></div>
+    </div>
+  </div>
+
+  <!-- Game Over -->
+  <div id="gameover" class="overlay" style="display:none">
+    <div class="big" id="gameOverTitle">EINSATZ BEENDET</div>
+    <div class="score">SCORE: <span id="finalScore">0</span></div>
+    <div style="font-size:20px;font-weight:800;color:#ffdd44;margin:4px 0 12px 0"><span id="finalKillsIcon">💀</span> ELIMINIERUNGEN: <span id="finalKills">0</span> KILLS</div>
+    <div class="rec" id="record"></div>
+    <div class="hs-box" id="hsBox">
+      <div class="hs-title">🏆 Bestenliste · <span id="hsBoard"></span></div>
+      <div class="hs-form" id="hsForm">
+        <input id="hsName" maxlength="16" placeholder="Dein Name" autocomplete="nickname" spellcheck="false">
+        <button class="btn primary" id="hsSubmit">Eintragen</button>
+      </div>
+      <ol class="hs-list" id="hsList"></ol>
+      <div class="hs-msg" id="hsMsg"></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn primary" data-act="restart">↻ Neuer Einsatz</button>
+      <button class="btn" id="gameOverModeBtn">🎮 Modus: SÖLDNER</button>
+      <button class="btn" id="gameOverArmoryBtn">⚔️ Waffenkammer</button>
+      <button class="btn" id="gameOverMapBtn">🗺️ Karte wählen</button>
+    </div>
+  </div>
+
+  <!-- Boot / Ladefenster -->
+  <div id="boot" class="overlay">
+    <div id="boot-emblem">🐰</div>
+    <div id="boot-title">RABBIT <span>OF DUTY</span></div>
+    <div id="boot-sub">Tactical Warren Operations</div>
+    <div id="boot-track"><div id="boot-bar"></div></div>
+    <div id="boot-status">Initialisiere…</div>
+    <div id="boot-tip">WASD — Bewegen · Maus — Zielen · Klick — Feuern · Shift — Sprinten · C — Ducken · X — Hinlegen</div>
+  </div>
+
+  <script>
+    // Fehler-Catcher ZUERST, damit auch Fehler der Colyseus-Lib erfasst werden.
+    window.__err = [];
+    function __rec(m){ window.__err.push(m); document.body && (document.body.dataset.err = (document.body.dataset.err||'') + m + ' | '); }
+    addEventListener('error', e => __rec(String(e.message || (e.error && e.error.stack) || e)));
+    addEventListener('unhandledrejection', e => __rec('REJECT: ' + String((e.reason && e.reason.stack) || e.reason)));
+  </script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/examples/jsm/": "./vendor/three/examples/jsm/",
+      "three/addons/": "./vendor/three/examples/jsm/",
+      "colyseus.js": "https://esm.sh/colyseus.js@0.15.28"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js?v=37"></script>
+</body>
+</html>

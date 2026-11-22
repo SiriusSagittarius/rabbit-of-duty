@@ -1,0 +1,32 @@
+# Rabbit of Duty – was NICHT ins (öffentliche) GitHub-Repo gehört
+# Siehe README → „Quellen, Lizenzen und Namensnennung“ und „Zombie-Modell einrichten“
+
+# --- Abhängigkeiten, System- und Editor-Dateien ---
+node_modules/
+server/node_modules/
+*.log
+Thumbs.db
+.DS_Store
+.claude/settings.local.json
+
+# --- Zombie-Modell „Zombie“ von dremorn (CGTrader, Royalty Free License) ---
+# Nutzung im Spiel erlaubt, erneutes Hochladen der Dateien nicht – auch nicht umgewandelt oder verschlüsselt.
+# images/net/ = Download + umgewandelte Einzeldateien (build/), assets/models/zombie/ = verschlüsseltes Paket + Schlüssel.
+# Wer das Repo klont, holt sich das Modell selbst: README → „Zombie-Modell einrichten“.
+images/net/
+assets/models/zombie/
+
+# --- Rohmodelle aus KI-Generatoren (Tripo, Meshy) ---
+# 30–65 MB je Datei (GitHub warnt ab 50 MB und lehnt über 100 MB ab). Erst verkleinert und mit
+# geklärter Lizenz einbauen. Die Figur „gun-wielding man“ zeigt einen echten Schauspieler und darf
+# nicht veröffentlicht werden.
+images/*.glb
+
+# --- Python-Zwischendateien ---
+__pycache__/
+
+# --- Eigene Fotos/Videos für die Fassaden (groß, zeigen evtl. Personen oder Kennzeichen) ---
+videos/
+
+# --- Bestenliste des Spielservers (Daten der Spieler, nicht ins Repo) ---
+server/data/

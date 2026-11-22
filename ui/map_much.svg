@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f82bd"/><stop offset="0.7" stop-color="#9dbbd8"/><stop offset="1" stop-color="#d2dde4"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6a6d72"/><stop offset="1" stop-color="#4a4d52"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#sky)"/>
+  <circle cx="262" cy="34" r="13" fill="#fff6e0" opacity="0.9"/>
+  <!-- Hügel -->
+  <path d="M0 112 C40 92 80 96 120 104 C170 86 230 88 320 102 L320 180 L0 180Z" fill="#7d9a5a"/>
+  <path d="M0 120 C60 108 110 116 160 112 C220 106 270 110 320 116 L320 180 L0 180Z" fill="#5f7d3a"/>
+  <!-- Bäume hinten -->
+  <g fill="#3f6a2c">
+    <circle cx="18" cy="114" r="9"/><circle cx="34" cy="110" r="11"/><circle cx="292" cy="110" r="10"/><circle cx="308" cy="114" r="8"/>
+  </g>
+  <!-- Kirche mit Turm -->
+  <rect x="196" y="98" width="62" height="34" fill="#f4f1ea"/>
+  <path d="M192 100 L227 78 L262 100Z" fill="#363b42"/>
+  <rect x="176" y="62" width="22" height="70" fill="#f1ede5"/>
+  <path d="M173 64 L187 18 L201 64Z" fill="#30353c"/>
+  <rect x="183" y="74" width="8" height="12" rx="4" fill="#2a3138"/>
+  <rect x="210" y="108" width="7" height="14" rx="3.5" fill="#2a3138"/><rect x="236" y="108" width="7" height="14" rx="3.5" fill="#2a3138"/>
+  <!-- Schieferhaus mit grünen Läden -->
+  <rect x="40" y="96" width="56" height="40" fill="#474d56"/>
+  <path d="M34 98 L68 72 L102 98Z" fill="#2f3339"/>
+  <g><rect x="50" y="106" width="9" height="12" fill="#ffffff"/><rect x="52" y="108" width="5" height="8" fill="#26313b"/>
+     <rect x="45" y="106" width="4.5" height="12" fill="#2f5b3d"/><rect x="59.5" y="106" width="4.5" height="12" fill="#2f5b3d"/></g>
+  <g><rect x="77" y="106" width="9" height="12" fill="#ffffff"/><rect x="79" y="108" width="5" height="8" fill="#26313b"/>
+     <rect x="72" y="106" width="4.5" height="12" fill="#2f5b3d"/><rect x="86.5" y="106" width="4.5" height="12" fill="#2f5b3d"/></g>
+  <!-- Fachwerkhaus -->
+  <rect x="104" y="100" width="46" height="36" fill="#f1ece1"/>
+  <path d="M99 102 L127 80 L155 102Z" fill="#7a3b2c"/>
+  <g stroke="#2b2420" stroke-width="2.6" fill="none">
+    <rect x="104" y="100" width="46" height="36"/><line x1="104" y1="118" x2="150" y2="118"/>
+    <line x1="119" y1="100" x2="119" y2="136"/><line x1="135" y1="100" x2="135" y2="136"/>
+    <line x1="104" y1="136" x2="119" y2="118"/><line x1="150" y1="136" x2="135" y2="118"/>
+  </g>
+  <rect x="123" y="104" width="8" height="10" fill="#26313b" stroke="#fff" stroke-width="1.4"/>
+  <!-- weißes Haus -->
+  <rect x="268" y="102" width="44" height="34" fill="#efe6dc"/>
+  <path d="M263 104 L290 84 L317 104Z" fill="#2f3339"/>
+  <rect x="276" y="110" width="8" height="11" fill="#26313b" stroke="#fff" stroke-width="1.4"/>
+  <rect x="296" y="110" width="8" height="11" fill="#26313b" stroke="#fff" stroke-width="1.4"/>
+  <!-- Straße mit Gehweg -->
+  <path d="M0 136 L320 136 L320 180 L0 180Z" fill="#9a958c"/>
+  <path d="M0 142 L320 142 L320 172 L0 172Z" fill="url(#road)"/>
+  <g fill="#e6e6de"><rect x="10" y="156" width="26" height="2"/><rect x="66" y="156" width="26" height="2"/><rect x="122" y="156" width="26" height="2"/><rect x="178" y="156" width="26" height="2"/><rect x="234" y="156" width="26" height="2"/><rect x="290" y="156" width="26" height="2"/></g>
+  <!-- Bauzaun -->
+  <g stroke="#c9ced3" stroke-width="1.2" fill="none" opacity="0.9">
+    <rect x="4" y="122" width="30" height="16"/><path d="M8 122v16M12 122v16M16 122v16M20 122v16M24 122v16M28 122v16M4 126h30M4 130h30M4 134h30"/>
+  </g>
+</svg>

@@ -1,0 +1,225 @@
+Spiel-Sounds in audio/sfx/ – erzeugt mit tools/sfx_build.py
+
+Aufnahmen: freesound.org, alle Creative Commons 0 (gemeinfrei). Originale liegen in audio/free/ (Liste: audio/free/text.md).
+Synthetisch: in tools/sfx_build.py aus Code erzeugt (eigene Arbeit, frei nutzbar).
+
+alarm.wav | synthetisch (tools/sfx_build.py)
+anstrengung_1.wav | MrFossy „547203__mrfossy__voice_adultmale_paingrunts_01“ (freesound.org, CC0)
+anstrengung_2.wav | MrFossy „547204__mrfossy__voice_adultmale_paingrunts_08“ (freesound.org, CC0)
+anstrengung_3.wav | MrFossy „547205__mrfossy__voice_adultmale_paingrunts_07“ (freesound.org, CC0)
+ausruestung_1.wav | synthetisch (tools/sfx_build.py)
+ausruestung_2.wav | synthetisch (tools/sfx_build.py)
+bach_loop.wav | synthetisch (tools/sfx_build.py)
+computer_1.wav | synthetisch (tools/sfx_build.py)
+computer_2.wav | synthetisch (tools/sfx_build.py)
+computer_3.wav | synthetisch (tools/sfx_build.py)
+countdown.wav | synthetisch (tools/sfx_build.py)
+einschlag_beton_1.wav | synthetisch (tools/sfx_build.py)
+einschlag_beton_2.wav | synthetisch (tools/sfx_build.py)
+einschlag_beton_3.wav | synthetisch (tools/sfx_build.py)
+einschlag_erde_1.wav | synthetisch (tools/sfx_build.py)
+einschlag_erde_2.wav | synthetisch (tools/sfx_build.py)
+einschlag_erde_3.wav | synthetisch (tools/sfx_build.py)
+einschlag_holz_1.wav | synthetisch (tools/sfx_build.py)
+einschlag_holz_2.wav | synthetisch (tools/sfx_build.py)
+einschlag_holz_3.wav | synthetisch (tools/sfx_build.py)
+einschlag_metall_1.wav | synthetisch (tools/sfx_build.py)
+einschlag_metall_2.wav | synthetisch (tools/sfx_build.py)
+einschlag_metall_3.wav | synthetisch (tools/sfx_build.py)
+explosion_1.wav | unfa „Outdoor Clean Explosions“ (freesound.org, CC0) + Synthese (Tiefe, Grollen)
+explosion_2.wav | unfa „Outdoor Clean Explosions“ (freesound.org, CC0) + Synthese (Tiefe, Grollen)
+explosion_nachhall.wav | synthetisch (tools/sfx_build.py)
+fallschaden.wav | schritte_stein + MrFossy (CC0)
+granate_aufprall_1.wav | synthetisch (tools/sfx_build.py)
+granate_aufprall_2.wav | synthetisch (tools/sfx_build.py)
+granate_aufprall_3.wav | synthetisch (tools/sfx_build.py)
+granate_stift.wav | synthetisch (tools/sfx_build.py)
+granate_wurf.wav | synthetisch (tools/sfx_build.py)
+hall_gewehr_aussen.wav | Nachhall aus schuss_sturmgewehr_1
+hall_gewehr_innen.wav | Nachhall aus schuss_sturmgewehr_1
+hall_pistole_aussen.wav | Nachhall aus schuss_pistole_1
+hall_pistole_innen.wav | Nachhall aus schuss_pistole_1
+hall_scharfschuetze_aussen.wav | Nachhall aus schuss_scharfschuetze_1
+hitmarker.wav | synthetisch (tools/sfx_build.py)
+kleidung_1.wav | synthetisch (tools/sfx_build.py)
+kleidung_2.wav | synthetisch (tools/sfx_build.py)
+kleidung_3.wav | synthetisch (tools/sfx_build.py)
+kleidung_4.wav | synthetisch (tools/sfx_build.py)
+kleidung_5.wav | synthetisch (tools/sfx_build.py)
+kleidung_6.wav | synthetisch (tools/sfx_build.py)
+kleidung_lang.wav | synthetisch (tools/sfx_build.py)
+knopf_klick.wav | synthetisch (tools/sfx_build.py)
+koerperfall_1.wav | synthetisch (tools/sfx_build.py)
+koerperfall_2.wav | synthetisch (tools/sfx_build.py)
+koerperfall_3.wav | synthetisch (tools/sfx_build.py)
+kolbenschlag_1.wav | Mixedupmoviestuff (CC0) + Synthese
+kolbenschlag_2.wav | Mixedupmoviestuff (CC0) + Synthese
+landung_1.wav | schritte_stein + Synthese
+landung_2.wav | schritte_stein + Synthese
+leer_klick.wav | KlawyKogut „Empty Gun Shot“ (freesound.org, CC0)
+magazin_klopf.wav | sldosher (CC0), bearbeitet
+magazin_raus.wav | sldosher (CC0) + Synthese
+magazin_rein.wav | sldosher „Gun Magazine Reload“ + KlawyKogut (CC0), bearbeitet
+maschine_loop.wav | synthetisch (tools/sfx_build.py)
+menue_ausruesten.wav | synthetisch (tools/sfx_build.py)
+menue_auswahl.wav | synthetisch (tools/sfx_build.py)
+menue_klick.wav | synthetisch (tools/sfx_build.py)
+menue_zurueck.wav | synthetisch (tools/sfx_build.py)
+messer_schwung_1.wav | synthetisch (tools/sfx_build.py)
+messer_schwung_2.wav | synthetisch (tools/sfx_build.py)
+messer_schwung_3.wav | synthetisch (tools/sfx_build.py)
+messer_stich_1.wav | Mixedupmoviestuff „Knife Stab“ (CC0)
+messer_stich_2.wav | Mixedupmoviestuff „Knife Stab“ (CC0), Variante
+messer_stich_3.wav | Mixedupmoviestuff „Knife Stab“ (CC0), Variante
+messer_weg.wav | synthetisch (tools/sfx_build.py)
+messer_ziehen.wav | synthetisch (tools/sfx_build.py)
+piep.wav | synthetisch (tools/sfx_build.py)
+pistole_magazin_raus.wav | sldosher (CC0) + Synthese
+pistole_magazin_rein.wav | Variante von magazin_rein
+pistole_schlitten_vor.wav | sldosher (CC0) + Synthese
+pistole_schlitten_zurueck.wav | KlawyKogut (CC0) + Synthese
+querschlaeger_1.wav | aust_paul „bullet ricochet“ (freesound.org, CC0)
+querschlaeger_2.wav | aust_paul „bullet ricochet“ (freesound.org, CC0)
+querschlaeger_3.wav | aust_paul „bullet ricochet“ (freesound.org, CC0)
+querschlaeger_4.wav | aust_paul „bullet ricochet“ (freesound.org, CC0)
+radar.wav | synthetisch (tools/sfx_build.py)
+rauch_ende.wav | synthetisch (tools/sfx_build.py)
+rauch_loop.wav | synthetisch (tools/sfx_build.py)
+rauch_start.wav | synthetisch (tools/sfx_build.py)
+repetierer_hoch.wav | synthetisch (tools/sfx_build.py)
+repetierer_runter.wav | sldosher (CC0) + Synthese
+repetierer_vor.wav | sldosher (CC0) + Synthese
+repetierer_zurueck.wav | KlawyKogut (CC0) + Synthese
+schmerz_1.wav | MrFossy „547191__mrfossy__voice_adultmale_paingrunts_19“ (freesound.org, CC0)
+schmerz_10.wav | MrFossy „547200__mrfossy__voice_adultmale_paingrunts_04“ (freesound.org, CC0)
+schmerz_11.wav | MrFossy „547201__mrfossy__voice_adultmale_paingrunts_03“ (freesound.org, CC0)
+schmerz_12.wav | MrFossy „547202__mrfossy__voice_adultmale_paingrunts_02“ (freesound.org, CC0)
+schmerz_2.wav | MrFossy „547192__mrfossy__voice_adultmale_paingrunts_13“ (freesound.org, CC0)
+schmerz_3.wav | MrFossy „547193__mrfossy__voice_adultmale_paingrunts_14“ (freesound.org, CC0)
+schmerz_4.wav | MrFossy „547194__mrfossy__voice_adultmale_paingrunts_11“ (freesound.org, CC0)
+schmerz_5.wav | MrFossy „547195__mrfossy__voice_adultmale_paingrunts_12“ (freesound.org, CC0)
+schmerz_6.wav | MrFossy „547196__mrfossy__voice_adultmale_paingrunts_17“ (freesound.org, CC0)
+schmerz_7.wav | MrFossy „547197__mrfossy__voice_adultmale_paingrunts_18“ (freesound.org, CC0)
+schmerz_8.wav | MrFossy „547198__mrfossy__voice_adultmale_paingrunts_15“ (freesound.org, CC0)
+schmerz_9.wav | MrFossy „547199__mrfossy__voice_adultmale_paingrunts_16“ (freesound.org, CC0)
+schritte_beton_1.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_2.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_3.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_4.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_5.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_6.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_7.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_beton_8.wav | YannSauvin „Footsteps boots run on asphalt“ (freesound.org, CC0)
+schritte_gras_1.wav | Fission9 „hiking boot footsteps on grass“ (freesound.org, CC0)
+schritte_gras_2.wav | Fission9 „hiking boot footsteps on grass“ (freesound.org, CC0)
+schritte_gras_3.wav | Fission9 „hiking boot footsteps on grass“ (freesound.org, CC0)
+schritte_gras_4.wav | Fission9 „hiking boot footsteps on grass“ (freesound.org, CC0)
+schritte_gras_5.wav | Fission9 „hiking boot footsteps on grass“ (freesound.org, CC0)
+schritte_gras_6.wav | Fission9 „hiking boot footsteps on grass“ (freesound.org, CC0)
+schritte_holz_1.wav | Fission9 „hiking boot footsteps on wooden planks“ (freesound.org, CC0)
+schritte_holz_2.wav | Fission9 „hiking boot footsteps on wooden planks“ (freesound.org, CC0)
+schritte_holz_3.wav | Fission9 „hiking boot footsteps on wooden planks“ (freesound.org, CC0)
+schritte_holz_4.wav | Fission9 „hiking boot footsteps on wooden planks“ (freesound.org, CC0)
+schritte_holz_5.wav | Fission9 „hiking boot footsteps on wooden planks“ (freesound.org, CC0)
+schritte_holz_6.wav | Fission9 „hiking boot footsteps on wooden planks“ (freesound.org, CC0)
+schritte_kies_1.wav | Fission9 „hiking boot footsteps on gravel“ (freesound.org, CC0)
+schritte_kies_2.wav | Fission9 „hiking boot footsteps on gravel“ (freesound.org, CC0)
+schritte_kies_3.wav | Fission9 „hiking boot footsteps on gravel“ (freesound.org, CC0)
+schritte_kies_4.wav | Fission9 „hiking boot footsteps on gravel“ (freesound.org, CC0)
+schritte_kies_5.wav | Variante von schritte_kies
+schritte_kies_6.wav | Variante von schritte_kies
+schritte_metall_1.wav | schritte_stein + Synthese (Metall)
+schritte_metall_2.wav | schritte_stein + Synthese (Metall)
+schritte_metall_3.wav | schritte_stein + Synthese (Metall)
+schritte_metall_4.wav | schritte_stein + Synthese (Metall)
+schritte_stein_1.wav | Fission9 „hiking boot footsteps on stone“ (freesound.org, CC0)
+schritte_stein_2.wav | Fission9 „hiking boot footsteps on stone“ (freesound.org, CC0)
+schritte_stein_3.wav | Fission9 „hiking boot footsteps on stone“ (freesound.org, CC0)
+schritte_stein_4.wav | Fission9 „hiking boot footsteps on stone“ (freesound.org, CC0)
+schritte_stein_5.wav | Fission9 „hiking boot footsteps on stone“ (freesound.org, CC0)
+schritte_stein_6.wav | Fission9 „hiking boot footsteps on stone“ (freesound.org, CC0)
+schritte_wasser_1.wav | schritte_gras + Synthese (Wasser)
+schritte_wasser_2.wav | schritte_gras + Synthese (Wasser)
+schritte_wasser_3.wav | schritte_gras + Synthese (Wasser)
+schritte_wasser_4.wav | schritte_gras + Synthese (Wasser)
+schritte_weich_1.wav | Variante von schritte_gras (weich)
+schritte_weich_2.wav | Variante von schritte_gras (weich)
+schritte_weich_3.wav | Variante von schritte_gras (weich)
+schritte_weich_4.wav | Variante von schritte_gras (weich)
+schuss_fern_gewehr_1.wav | Variante von schuss_sturmgewehr_1 (Ferne)
+schuss_fern_gewehr_2.wav | Variante von schuss_sturmgewehr_2 (Ferne)
+schuss_fern_pistole_1.wav | Variante von schuss_pistole_1 (Ferne)
+schuss_fern_pistole_2.wav | Variante von schuss_pistole_2 (Ferne)
+schuss_pistole_1.wav | ken788 „Handgun_Shot“ (freesound.org, CC0)
+schuss_pistole_2.wav | acidsnowflake „Small pistol gunshot indoors“ (freesound.org, CC0)
+schuss_pistole_3.wav | Variante von schuss_pistole_1
+schuss_pistole_4.wav | Variante von schuss_pistole_2
+schuss_scharfschuetze_1.wav | qubodup „Sniper Shots“ (freesound.org, CC0)
+schuss_scharfschuetze_2.wav | qubodup „Sniper Shots“ (freesound.org, CC0)
+schuss_scharfschuetze_3.wav | qubodup „Sniper Shots“ (freesound.org, CC0)
+schuss_scharfschuetze_4.wav | Variante von schuss_scharfschuetze_1
+schuss_sturmgewehr_1.wav | CS279 „G36-E Fire“ (freesound.org, CC0)
+schuss_sturmgewehr_2.wav | pgi „Machine Gun 001 - single shot“ (freesound.org, CC0)
+schuss_sturmgewehr_3.wav | Variante von schuss_sturmgewehr_1
+schuss_sturmgewehr_hell_1.wav | Variante von schuss_sturmgewehr_2
+schuss_sturmgewehr_hell_2.wav | Variante von schuss_sturmgewehr_1
+schuss_sturmgewehr_schwer_1.wav | Variante von schuss_sturmgewehr_1
+schuss_sturmgewehr_schwer_2.wav | Variante von schuss_sturmgewehr_2
+soldat_tod_1.wav | MrFossy „547181__mrfossy__voice_adultmale_deathscream_04“ (freesound.org, CC0)
+soldat_tod_10.wav | MrFossy „547190__mrfossy__voice_adultmale_deathscream_09“ (freesound.org, CC0)
+soldat_tod_2.wav | MrFossy „547182__mrfossy__voice_adultmale_deathscream_03“ (freesound.org, CC0)
+soldat_tod_3.wav | MrFossy „547183__mrfossy__voice_adultmale_deathscream_02“ (freesound.org, CC0)
+soldat_tod_4.wav | MrFossy „547184__mrfossy__voice_adultmale_deathscream_01“ (freesound.org, CC0)
+soldat_tod_5.wav | MrFossy „547185__mrfossy__voice_adultmale_deathscream_08“ (freesound.org, CC0)
+soldat_tod_6.wav | MrFossy „547186__mrfossy__voice_adultmale_deathscream_07“ (freesound.org, CC0)
+soldat_tod_7.wav | MrFossy „547187__mrfossy__voice_adultmale_deathscream_06“ (freesound.org, CC0)
+soldat_tod_8.wav | MrFossy „547188__mrfossy__voice_adultmale_deathscream_05“ (freesound.org, CC0)
+soldat_tod_9.wav | MrFossy „547189__mrfossy__voice_adultmale_deathscream_10“ (freesound.org, CC0)
+sprung.wav | synthetisch (tools/sfx_build.py)
+stille.wav | synthetisch (tools/sfx_build.py)
+stinger_niederlage.wav | synthetisch (tools/sfx_build.py)
+stinger_sieg.wav | synthetisch (tools/sfx_build.py)
+stinger_spawn.wav | synthetisch (tools/sfx_build.py)
+stinger_unentschieden.wav | synthetisch (tools/sfx_build.py)
+stinger_zeit.wav | synthetisch (tools/sfx_build.py)
+tief_explosion.wav | synthetisch (tools/sfx_build.py)
+tief_gewehr.wav | synthetisch (tools/sfx_build.py)
+tief_scharfschuetze.wav | synthetisch (tools/sfx_build.py)
+treffer_koerper_1.wav | Mixedupmoviestuff „Knife Stab“ (CC0), bearbeitet
+treffer_koerper_2.wav | Mixedupmoviestuff „Knife Stab“ (CC0), bearbeitet
+treffer_koerper_3.wav | Mixedupmoviestuff „Knife Stab“ (CC0), bearbeitet
+treffer_kopf_1.wav | Mixedupmoviestuff (CC0) + Synthese
+treffer_kopf_2.wav | Mixedupmoviestuff (CC0) + Synthese
+truemmer_beton_1.wav | synthetisch (tools/sfx_build.py)
+truemmer_beton_2.wav | synthetisch (tools/sfx_build.py)
+truemmer_beton_3.wav | synthetisch (tools/sfx_build.py)
+truemmer_erde_1.wav | synthetisch (tools/sfx_build.py)
+truemmer_erde_2.wav | synthetisch (tools/sfx_build.py)
+truemmer_erde_3.wav | synthetisch (tools/sfx_build.py)
+truemmer_holz_1.wav | synthetisch (tools/sfx_build.py)
+truemmer_holz_2.wav | synthetisch (tools/sfx_build.py)
+truemmer_metall_1.wav | synthetisch (tools/sfx_build.py)
+truemmer_metall_2.wav | synthetisch (tools/sfx_build.py)
+ueberschall_1.wav | synthetisch (tools/sfx_build.py)
+ueberschall_2.wav | synthetisch (tools/sfx_build.py)
+verschluss_vor.wav | sldosher (CC0) + Synthese
+verschluss_zurueck.wav | KlawyKogut (CC0) + Synthese
+vorbeizischen_1.wav | synthetisch (tools/sfx_build.py)
+vorbeizischen_2.wav | synthetisch (tools/sfx_build.py)
+vorbeizischen_3.wav | synthetisch (tools/sfx_build.py)
+waffe_weg.wav | synthetisch (tools/sfx_build.py)
+waffe_ziehen.wav | synthetisch (tools/sfx_build.py)
+wind_boee_1.wav | synthetisch (tools/sfx_build.py)
+wind_boee_2.wav | synthetisch (tools/sfx_build.py)
+wind_loop.wav | synthetisch (tools/sfx_build.py)
+zielen_raus.wav | synthetisch (tools/sfx_build.py)
+zielen_rein.wav | synthetisch (tools/sfx_build.py)
+zielfernrohr.wav | synthetisch (tools/sfx_build.py)
+zombie_angriff_1.wav | MrFossy (CC0), bearbeitet
+zombie_angriff_2.wav | MrFossy (CC0), bearbeitet
+zombie_stoehnen_1.wav | MrFossy (CC0), tiefer gelegt + Knurren + Verzerrung
+zombie_stoehnen_2.wav | MrFossy (CC0), tiefer gelegt + Knurren + Verzerrung
+zombie_stoehnen_3.wav | MrFossy (CC0), tiefer gelegt + Knurren + Verzerrung
+zombie_stoehnen_4.wav | MrFossy (CC0), tiefer gelegt + Knurren + Verzerrung
+zombie_tod_1.wav | MrFossy (CC0), bearbeitet (Gurgeln)
+zombie_tod_2.wav | MrFossy (CC0), bearbeitet (Gurgeln)

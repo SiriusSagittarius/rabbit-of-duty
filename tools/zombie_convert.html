@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Zombie-Umwandlung (FBX → GLB)</title>
+<style>body{font:13px monospace;background:#111;color:#cfc;padding:16px} a{color:#7ef0c0}</style>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<h3>Zombie-Umwandlung: images/net (CGTrader-Paket) → zombie.glb (nach images/net/build/ speichern, dann node tools/zombie_pack.mjs)</h3>
+<p>Wird von <code>tools/zombie_convert.mjs</code> im Testbrowser aufgerufen (oder: Seite öffnen → Download-Link).</p>
+<pre id="log"></pre>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const SRC = '../images/net/';
+const ANIMS = ['walk', 'run', 'idle1', 'idle2', 'atack1', 'atack2', 'atack3', 'atack4', 'gethit', 'roar', 'death1', 'death2'];
+const KEEP_ROOT_MOTION = new Set(['death1', 'death2']);     // Sterben darf sich vom Fleck bewegen
+const url = (p) => SRC + p.split('/').map(encodeURIComponent).join('/');
+const out = document.getElementById('log');
+const say = (s) => { out.textContent += s + '\n'; };
+
+/** Alle SkinnedMeshes zu EINEM verschmelzen (gemeinsames Skelett) → 1 Draw-Call pro Zombie statt 7. */
+function mergeSkinned(list) {
+  const bones = [], boneIdx = new Map(), inverses = [];
+  for (const m of list) m.skeleton.bones.forEach((b, i) => {
+    if (!boneIdx.has(b)) { boneIdx.set(b, bones.length); bones.push(b); inverses.push(m.skeleton.boneInverses[i].clone()); }
+  });
+  let nv = 0, ni = 0;
+  for (const m of list) { const g = m.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
+  const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4), idx = new Uint32Array(ni);
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  let vo = 0, io = 0;
+  for (const m of list) {
+    const g = m.geometry, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+    const SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+    nm.getNormalMatrix(m.bindMatrix);
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(m.bindMatrix); pos.set([v.x, v.y, v.z], (vo + i) * 3);
+      if (N) { v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], (vo + i) * 3); }
+      if (U) uv.set([U.getX(i), U.getY(i)], (vo + i) * 2);
+      let wsum = 0;
+      for (let k = 0; k < 4; k++) {
+        const w = SW.getComponent(i, k), b = SI.getComponent(i, k);
+        si[(vo + i) * 4 + k] = w > 0 ? boneIdx.get(m.skeleton.bones[b]) : 0;
+        sw[(vo + i) * 4 + k] = w; wsum += w;
+      }
+      if (wsum > 0) for (let k = 0; k < 4; k++) sw[(vo + i) * 4 + k] /= wsum;
+    }
+    const cnt = g.index ? g.index.count : P.count;
+    for (let j = 0; j < cnt; j++) idx[io + j] = (g.index ? g.index.getX(j) : j) + vo;
+    vo += P.count; io += cnt;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  const geoM = mergeVertices(geo, 1e-5);           // gleiche Ecken (Position, Normale, UV, Gewichte) zusammenfassen
+  geoM.computeBoundingBox(); geoM.computeBoundingSphere();
+  const mesh = new THREE.SkinnedMesh(geoM, new THREE.MeshStandardMaterial({ name: 'zombie' }));
+  mesh.name = 'zombie';
+  mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
+  return mesh;
+}
+
+async function convert() {
+  const loader = new FBXLoader();
+  const model = await loader.loadAsync(url('Base+mesh/Base mesh/Base mesh fbx.fbx'));
+  model.updateMatrixWorld(true);
+  const skinned = [], allBones = [];
+  model.traverse(o => { if (o.isSkinnedMesh) skinned.push(o); if (o.isBone) allBones.push(o); });
+  const info = {
+    modelScale: model.scale.toArray(), parts: skinned.map(m => ({ name: m.name, verts: m.geometry.attributes.position.count, bones: m.skeleton.bones.length, mats: [].concat(m.material).map(x => x.name) })),
+    bones: allBones.length, rootBones: allBones.filter(b => !b.parent || !b.parent.isBone).map(b => b.name),
+  };
+  say('Modell: ' + JSON.stringify(info));
+
+  // Animationen laden (jede FBX enthält Rig + einen Take)
+  const clips = [];
+  for (const name of ANIMS) {
+    const a = await loader.loadAsync(url(`Zombie+animation/animation fbx/zombie@${name}.fbx`));
+    const clip = a.animations[0];
+    clip.name = name;
+    clips.push(clip);
+    say(`  ${name}: ${clip.duration.toFixed(2)} s, ${clip.tracks.length} Spuren`);
+  }
+
+  // Hüfte = Wurzelknochen des Skeletts (Root-Motion sitzt dort)
+  const hipsBone = allBones.find(b => /hips$/i.test(b.name) && (!b.parent || !b.parent.isBone)) || allBones.find(b => !b.parent || !b.parent.isBone);
+  const hips = hipsBone.name;
+  const parentM = hipsBone.parent.matrixWorld;
+  // Blickrichtung des Modells: Fuß → Zehe (in Weltkoordinaten der Bind-Pose)
+  const foot = allBones.find(b => /LeftFoot$/i.test(b.name)), toe = allBones.find(b => /LeftToeBase$/i.test(b.name));
+  const fw = toe && foot ? new THREE.Vector3().setFromMatrixPosition(toe.matrixWorld).sub(new THREE.Vector3().setFromMatrixPosition(foot.matrixWorld)) : new THREE.Vector3(0, 0, 1);
+  const facing = Math.abs(fw.z) >= Math.abs(fw.x) ? Math.sign(fw.z) : Math.sign(fw.x) * 2;   // ±1 = ±Z, ±2 = ±X
+  const speeds = {};
+  for (const clip of clips) {
+    const t = clip.tracks.find(tr => tr.name === hips + '.position');
+    if (!t) continue;
+    const v = t.values, n = v.length / 3;
+    const a = new THREE.Vector3(v[0], v[1], v[2]).applyMatrix4(parentM), b = new THREE.Vector3(v[(n - 1) * 3], v[(n - 1) * 3 + 1], v[(n - 1) * 3 + 2]).applyMatrix4(parentM);
+    speeds[clip.name] = +(Math.hypot(b.x - a.x, b.z - a.z) / clip.duration).toFixed(3);
+    if (!KEEP_ROOT_MOTION.has(clip.name)) {     // horizontale Wurzelbewegung entfernen (das Spiel bewegt den Zombie selbst)
+      const rx = hipsBone.position.x, rz = hipsBone.position.z;
+      for (let i = 0; i < n; i++) { v[i * 3] = rx; v[i * 3 + 2] = rz; }
+    }
+  }
+  // Spuren ausdünnen: nur Knochen, die die Haut verformen (+ deren Eltern); konstante Spuren in Ruhelage weglassen
+  const deform = new Set();
+  for (const m of skinned) for (const b of m.skeleton.bones) { let p = b; while (p && p.isBone && !deform.has(p)) { deform.add(p); p = p.parent; } }
+  const deformNames = new Set([...deform].map(b => b.name));
+  const near = (a, b, eps) => Math.abs(a - b) <= eps;
+  let before = 0, after = 0;
+  for (const clip of clips) {
+    before += clip.tracks.length;
+    clip.optimize();
+    clip.tracks = clip.tracks.filter(t => {
+      const dot = t.name.lastIndexOf('.'), node = t.name.slice(0, dot), prop = t.name.slice(dot + 1);
+      if (!deformNames.has(node)) return false;
+      const bone = model.getObjectByName(node), v = t.values, k = prop === 'quaternion' ? 4 : 3;
+      const rest = prop === 'position' ? bone.position.toArray() : prop === 'scale' ? bone.scale.toArray() : bone.quaternion.toArray();
+      const eps = prop === 'position' ? 0.05 : 1e-4;
+      let still = true;
+      for (let i = 0; i < v.length && still; i += k) for (let j = 0; j < k; j++) if (!near(v[i + j], rest[j], eps)) { still = false; break; }
+      if (still && prop === 'quaternion') still = true;
+      return !still || node === hips;            // Hüfte immer behalten (Höhe beim Gehen)
+    });
+    clip.resetDuration();
+    after += clip.tracks.length;
+  }
+  say(`Spuren: ${before} → ${after} (nur verformende Knochen, ohne Ruhelage-Konstanten)`);
+
+  // Teile verschmelzen; Original-Meshes entfernen
+  const merged = mergeSkinned(skinned);
+  for (const m of skinned) m.parent.remove(m);
+  const bb = merged.geometry.boundingBox;
+  const scene = new THREE.Scene();
+  scene.add(model, merged);
+  scene.userData.rod = {
+    source: 'CGTrader "Zombie" (free, Royalty Free License) – nicht weiterverteilen, siehe images/net/build/LIZENZ.txt',
+    height: +(bb.max.y - bb.min.y).toFixed(4), footY: +bb.min.y.toFixed(4), hips, facing, speeds,
+    clips: Object.fromEntries(clips.map(c => [c.name, +c.duration.toFixed(3)])),
+  };
+  say('Daten: ' + JSON.stringify(scene.userData.rod));
+  say(`Verschmolzen: ${merged.geometry.attributes.position.count} Vertices, ${merged.geometry.index.count / 3} Dreiecke, ${merged.skeleton.bones.length} Knochen`);
+
+  const glb = await new GLTFExporter().parseAsync(scene, { binary: true, animations: clips, onlyVisible: false });
+  const bytes = new Uint8Array(glb);
+  say(`GLB: ${(bytes.length / 1024).toFixed(0)} KB`);
+  let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  document.body.dataset.glb = btoa(bin);
+  document.body.dataset.info = JSON.stringify({ ...info, rod: scene.userData.rod, verts: merged.geometry.attributes.position.count, tris: merged.geometry.index.count / 3 });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'model/gltf-binary' })); a.download = 'zombie.glb'; a.textContent = 'zombie.glb herunterladen';
+  document.body.appendChild(a);
+  document.body.dataset.done = '1';
+}
+if (!location.search.includes('noop')) convert().catch(err => { say('FEHLER: ' + (err.stack || err)); document.body.dataset.error = String(err.stack || err); document.body.dataset.done = '1'; });
+</script>
+</body>
+</html>
