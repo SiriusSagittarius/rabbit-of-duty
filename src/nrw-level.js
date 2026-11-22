@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { pointInPoly, closestOnPoly } from './poly2d.js';
-import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas } from './much-shops.js?v=4';
+import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=5';
 
 /**
  * NRW-Geobasisdaten → echte Kulisse (Daten aus tools/nrw_fetch.py, Ordner assets/nrw/<ort>/):
@@ -500,7 +500,7 @@ function shopFrontMesh(D, fronts) {
   if (!list.length) return null;
   // Wandumriss je Front in Bildkoordinaten (x ab linkem Rand, h über Straßenniveau) – fürs Zeichnen des Giebels
   for (const f of list) f.outline = f.full ? f.front.polys.map(q => q.map((v, i) => (i % 2 ? v - f.base : v - f.front.u0))) : null;
-  const key = list.map(f => `${f.shop.name}:${f.width.toFixed(2)}:${f.top.toFixed(2)}:${f.plinth.toFixed(2)}${f.full ? ':G' + f.eave.toFixed(2) : ''}`).join('|');
+  const key = list.map(f => `${f.shop.name}:${f.width.toFixed(2)}:${f.top.toFixed(2)}:${f.plinth.toFixed(2)}${f.full ? ':G' + f.eave.toFixed(2) : ''}${f.photo ? ':P' + f.photo : ''}`).join('|');
   if (D.shopAtlas?.key !== key) {
     D.shopAtlas?.tex.dispose();
     const { canvas, rects } = drawShopAtlas(list);
@@ -563,7 +563,8 @@ function shopFrontMesh(D, fronts) {
   m.name = 'shopFronts';
   m.receiveShadow = true;
   m.userData.shops = list.map(f => ({ name: f.shop.name, width: +f.width.toFixed(2), top: +f.top.toFixed(2), plinth: +f.plinth.toFixed(2),
-    base: +f.base.toFixed(2), center: [+(f.front.rx * (f.front.u0 + f.front.u1) / 2 + f.front.nx * f.front.off).toFixed(1),
+    base: +f.base.toFixed(2), eave: +f.eave.toFixed(2), full: f.full, photo: f.photo,
+    outline: f.outline && f.outline.map(q => q.map(v => +v.toFixed(2))), center: [+(f.front.rx * (f.front.u0 + f.front.u1) / 2 + f.front.nx * f.front.off).toFixed(1),
       +(f.front.rz * (f.front.u0 + f.front.u1) / 2 + f.front.nz * f.front.off).toFixed(1)], normal: [+f.front.nx.toFixed(2), +f.front.nz.toFixed(2)] }));
   m.userData.skipped = fronts.filter(f => !list.includes(f)).map(f => `${f.shop.name} (Höhe ${f.top.toFixed(2)} m)`);
   return m;
@@ -624,6 +625,7 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
   let D;
   try { D = await loadData(loc.nrw); }
   catch (err) { console.warn('NRW-Daten nicht ladbar – flache OSM-Kulisse wird gebaut:', err); return null; }
+  if (D.meta.name === 'much') await loadShopPhotos();     // eigene Fassadenfotos (fehlende → gezeichnete Front)
   if (!isActive()) return null;
 
   const M = U.getMats(), G = U.shared();
@@ -767,11 +769,14 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
         if (!F) { console.warn('Ladenfront nicht gefunden:', name); return; }
         const lv = streetLevel(F, H, b.y0);
         if (k === 0) floorY = lv.base;
-        // full: Bild über die ganze Wand bis in den Giebel (Höhe = höchster Punkt der Wand), sonst nur Erdgeschoss
+        // full: Bild über die ganze Wand bis in den Giebel (Höhe = höchster Punkt der Wand), sonst nur Erdgeschoss.
+        // Ein eigenes Foto der Wand (photo) bedeckt immer die ganze Wand.
+        const photo = shopPhotoOf(spec), full = !!spec.full || !!photo;
+        if (!photo && !spec.draw) return;                  // Wohnhaus nur mit Foto: ohne Foto keine Front
         let top = Math.min(SHOP_TOP, F.eave - 0.05 - lv.base);
-        if (spec.full) for (const q of F.polys) for (let j = 1; j < q.length; j += 2) top = Math.max(top, q[j] - lv.base);
-        shopFronts.push({ shop: { name, draw: spec.draw }, front: F, base: lv.base, plinth: lv.base - lv.bottom,
-          width: F.u1 - F.u0, top, full: !!spec.full, eave: F.eave - lv.base });
+        if (full) for (const q of F.polys) for (let j = 1; j < q.length; j += 2) top = Math.max(top, q[j] - lv.base);
+        shopFronts.push({ shop: { name, draw: spec.draw, tint: spec.tint || shop.tint }, photo, front: F, base: lv.base,
+          plinth: lv.base - lv.bottom, width: F.u1 - F.u0, top, full, eave: F.eave - lv.base });
       });
     }
     const style = shop ? shop.wall : styleFor(b, rng);

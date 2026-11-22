@@ -26,7 +26,9 @@ images/*.glb
 __pycache__/
 
 # --- Eigene Fotos/Videos für die Fassaden (groß, zeigen evtl. Personen oder Kennzeichen) ---
+# Ins Spiel kommen nur die entzerrten Fassaden-Ausschnitte in assets/nrw/much/fronts/ (tools/rectify_fronts.py)
 videos/
+assets/imgmuch/
 
 # --- Bestenliste des Spielservers (Daten der Spieler, nicht ins Repo) ---
 server/data/

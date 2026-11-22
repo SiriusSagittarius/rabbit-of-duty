@@ -40,7 +40,8 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
 - **Bäume** an ihren echten Standorten in echter Höhe.
 - **Straßen, Wege und Straßennamen** aus OpenStreetMap.
 - **18 Läden an der Hauptstraße** (Nr. 19 bis 34) haben ihren echten Haustyp und eine gezeichnete Ladenfront mit
-  Schriftzug. Haustypen sind Fachwerk, Schiefer, Putz, Klinker und Naturstein.
+  Schriftzug. Haustypen sind Fachwerk, Schiefer, Putz, Klinker und Naturstein. Erste Fassaden zeigen schon
+  eigene Fotos (Nr. 25, 27, Erdgeschoss von 29, Schild von 28).
 - **Spielfläche** 930 × 540 m. Start ist an der Hauptstraße beim Rathaus.
 
 ### Technik
@@ -158,7 +159,7 @@ Auf dem Besen:
 | `src/net.js`, `server/` | Mehrspieler mit Colyseus und die Bestenliste (`server/src/highscores.ts`) |
 | `assets/` | Kartendaten (`nrw/`, `osm/`), Modelle und Sounds |
 | `ui/` | Vorschaubilder der Karten (`maps/`) und Waffen (`armory/`), Bild des Flugbesens |
-| `tools/` | Werkzeuge für Kartendaten, Sounds und das Zombie-Modell (Python, Packen mit Node) |
+| `tools/` | Werkzeuge für Kartendaten, Fassadenfotos, Sounds und das Zombie-Modell (Python, Packen mit Node) |
 | `vendor/three/` | Three.js |
 
 ## Erweitern
@@ -196,7 +197,7 @@ npx @gltf-transform/cli optimize roh.glb assets/models/weapons/neu.glb --compres
 ### Ladenfronten
 
 In `src/much-shops.js` steht je Adresse ein Eintrag mit Haustyp, Farbe und einer Funktion, die die Front zeichnet.
-Es gibt vier Zusatzoptionen:
+Es gibt diese Zusatzoptionen:
 
 | Option | Wirkung |
 |---|---|
@@ -204,6 +205,12 @@ Es gibt vier Zusatzoptionen:
 | `near` | wählt die richtige Wand, wenn ein Haus mehrere Straßenseiten hat |
 | `more` | weitere Fronten am selben Haus |
 | `full` | Bild über die ganze Wand bis in den Giebel |
+| `photo` | eigenes, entzerrtes Foto der ganzen Wand statt der gezeichneten Front |
+| `photos` | Fotos, die die Zeichenfunktion einsetzt, z. B. ein Ladenschild (`P.photo(name, x0, x1, h0, h1)`) |
+
+Eigene Fotos entzerren: Quellbild, vier Eckpunkte und Wandmaß in `tools/fronts.json` eintragen, dann
+`python tools/rectify_fronts.py` (braucht Pillow und NumPy). Ergebnis: `assets/nrw/much/fronts/<name>.webp`.
+Die Rohbilder in `assets/imgmuch/` bleiben lokal, sie können Personen oder Kennzeichen zeigen.
 
 ## Zombie-Modell einrichten
 
@@ -256,6 +263,7 @@ Auf einen Webserver gehören nur `assets/models/zombie/zombie.pak` und `zombie.k
 | Soundeffekte (`audio/free/`, `audio/sfx/`) | freesound.org, CC0, plus eigene Synthese; Liste mit Links in `audio/free/text.md` und `audio/sfx/QUELLEN.txt` | ja |
 | Flugbesen in der Hand (`ui/besen.webp`) | eigenes Bild, erstellt mit Gemini (Google) | ja |
 | Waffenbilder der Waffenkammer (`ui/armory/`) | aus den Waffenmodellen des Spiels gerendert | ja |
+| Fassadenfotos in Much (`assets/nrw/much/fronts/`) | eigene Fotos und Videos vom Gehweg aus, entzerrt mit `tools/rectify_fronts.py` | ja |
 | Mehrspieler (`server/`, Client von esm.sh) | Colyseus, MIT | Server ja |
 | Zombie-Modell | „Zombie free VR / AR / low-poly“ von dremorn (CGTrader), Royalty Free License | nein, selbst laden |
 
@@ -267,13 +275,14 @@ Licensed under Creative Commons: By Attribution 3.0, <https://creativecommons.or
 ## Hinweise
 
 - **Echte Orte und Läden:** Much und seine Geschäfte gibt es wirklich.
-  - Die Ladenfronten sind gezeichnete Nachbildungen. Namen und Schriftzüge erscheinen nur als Teil des
-    Straßenbilds, damit man die Orte wiedererkennt.
+  - Die Ladenfronten sind gezeichnete Nachbildungen oder eigene Fotos vom Gehweg aus. Namen und Schriftzüge
+    erscheinen nur als Teil des Straßenbilds, damit man die Orte wiedererkennt.
   - Es besteht keine Zusammenarbeit mit den Geschäften, der Gemeinde Much oder der Kreissparkasse. Niemand hat das
     Projekt beauftragt, gefördert oder bezahlt.
   - Marken und Logos gehören ihren Inhabern. Wer als Geschäft nicht im Spiel erscheinen möchte, meldet sich bitte
     über ein GitHub-Issue, dann nehme ich die Front heraus.
-- **Keine fremden Fotos:** Fassaden und Schilder sind aus Code gezeichnet.
+- **Keine fremden Fotos:** Fassaden und Schilder sind aus Code gezeichnet oder stammen aus eigenen Aufnahmen.
+  Street-View-Bilder dienten nur als Vorlage und sind nicht im Spiel.
 - **Erfundene Waffennamen:** Die Bauweise orientiert sich an echten Waffentypen, bildet aber kein bestimmtes
   Markenprodukt nach.
 - **Kein Bezug zu Call of Duty:** Der Name ist ein Wortspiel. Das Spiel hat nichts mit Activision oder

@@ -13,14 +13,40 @@
  *   near  optional: [x, z] in Spielkoordinaten nahe der Front, wenn das Haus mehrere Wände zur Straße hat
  *   more  optional: weitere Fronten desselben Hauses, je { name, draw, face?, near? }
  *   full  optional: das Bild bedeckt die ganze Wand bis in den Giebel (P.full, P.eave, P.roofAt(x) beim Zeichnen)
+ *   photo optional: eigenes, entzerrtes Foto der ganzen Wand (assets/nrw/much/fronts/<photo>.webp, gebaut mit
+ *         tools/rectify_fronts.py). Ist es da, ersetzt es draw() und bedeckt die ganze Wand; fehlt es, bleibt draw().
+ *   photos optional: weitere Fotos, die draw() mit P.photo(name, x0, x1, h0, h1) einsetzt (z. B. ein Ladenschild)
  *
  * nrw-level.js sucht je Laden die Wand, die zur Straße zeigt, setzt die Front auf das Straßenniveau davor,
  * richtet das Geschossraster des Hauses danach aus und packt alle Fronten in einen Texturatlas
- * (ein Mesh, ein Draw-Call). Für eigene Fotos später: draw() durch ein entzerrtes Foto der Front ersetzen.
+ * (ein Mesh, ein Draw-Call). Eigene Fotos: siehe photo/photos oben – sie kommen in denselben Atlas.
  */
 
 export const SHOP_PX = 64;        // Pixel pro Meter im Atlas
 export const SHOP_TOP = 3.4;      // Höhe der Front über Straßenniveau: Erdgeschoss 2,9 m + Schildband
+export const SHOP_PHOTO_DIR = './assets/nrw/much/fronts/';
+
+const PHOTOS = new Map();         // Name → geladenes Foto
+
+/** Alle Fotos laden, die Ladeneinträge nennen (photo, photos). Fehlt eine Datei, bleibt die gezeichnete Front. */
+export async function loadShopPhotos() {
+  const names = new Set();
+  for (const s of Object.values(MUCH_SHOPS)) {
+    for (const spec of [s, ...(s.more || [])]) {
+      if (spec.photo) names.add(spec.photo);
+      for (const n of spec.photos || []) names.add(n);
+    }
+  }
+  await Promise.all([...names].filter(n => !PHOTOS.has(n)).map(async (n) => {
+    const img = new Image();
+    img.src = SHOP_PHOTO_DIR + n + '.webp';
+    try { await img.decode(); PHOTOS.set(n, img); }
+    catch { console.warn('Fassadenfoto fehlt:', n); }
+  }));
+}
+
+/** Name des Wandfotos dieses Eintrags, wenn es geladen ist, sonst null. */
+export const shopPhotoOf = (spec) => (spec.photo && PHOTOS.has(spec.photo) ? spec.photo : null);
 
 const SANS = '"Segoe UI", Arial, Helvetica, sans-serif';
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -90,7 +116,7 @@ export const MUCH_SHOPS = {
     },
   },
   'Hauptstraße 25': {
-    name: 'Yoga & Pilates', wall: 'fachwerk', tint: '#ffffff',
+    name: 'Yoga & Pilates', wall: 'fachwerk', tint: '#ffffff', photo: 'hs25',     // Foto: Video des Users, 22.11.
     draw(P) {
       const { W, top } = P, oH = Math.min(2.35, top - 0.9);
       P.plaster('#f6f6f4'); P.plinthBand('#8e9297', 0.45);
@@ -106,9 +132,11 @@ export const MUCH_SHOPS = {
       P.text('MEDITATION', 0.66 * W, 1.9, 0.12, { color: '#e8f4f4', weight: '700' });
       P.text('FIT · BALANCE · ENERGIE', 0.69 * W, 1.03, 0.08, { color: '#cfe9e8', maxW: 0.3 * W });
     },
+    // Hinterer Westteil desselben Gebäudes (7 m zurück, davor Bildstock): dunkelblau verschieferter Giebel (nur mit Foto)
+    more: [{ name: 'Hauptstraße 25 (Schiefergiebel)', near: [267.45, -53.6], photo: 'hs25w' }],
   },
   'Hauptstraße 27': {
-    name: 'Michael Klement GmbH (duo)', wall: 'fachwerk', tint: '#fbf6ec',
+    name: 'Michael Klement GmbH (duo)', wall: 'fachwerk', tint: '#fbf6ec', photo: 'hs27', // Foto: Video des Users, 22.11.
     draw(P) {
       const { W, top } = P, oH = Math.min(2.3, top - 0.95);
       P.plaster('#f2eee5');
@@ -121,8 +149,9 @@ export const MUCH_SHOPS = {
     },
   },
   'Hauptstraße 29': {
-    name: 'Goldschmiede Peter Stapf', wall: 'slate', tint: '#ffffff',
+    name: 'Goldschmiede Peter Stapf', wall: 'slate', tint: '#ffffff', photos: ['hs29_eg'],
     draw(P) {
+      if (P.photo('hs29_eg', 0, P.W, 0, P.top, P.plinth)) return;           // Erdgeschoss: Video des Users, 22.11.
       const { W, top } = P, oH = Math.min(2.45, top - 0.8);
       P.plaster('#e6e6e3'); P.plinthBand('#a6a9ac', 0.42);
       P.steps(0.01 * W, 0.16 * W, 0, 0.42, 3, '#b9b9b6');
@@ -251,7 +280,9 @@ export const MUCH_SHOPS = {
   'Hauptstraße 28': {
     // Ladenfront im Westgiebel zum Vorplatz der Bäckerei, nicht zur Straße; links = Straßenecke, rechts = SH Mobil
     // full: das Bild bedeckt den ganzen Giebel – oben ein Fenster im Schiefer, darunter zwei im Fachwerk (nach Foto)
-    name: 'Fotostudio Olga Malleker', wall: 'fachwerk', tint: '#ffffff', face: 'W', full: true,
+    // Seit Ende 2026 zieht hier WIRGES Bad & Heizung ein (Fotos des Users vom 22.11.: Schild, „Hier entsteht eine
+    // moderne Badausstellung“, Hausnummer 28) – vorher Fotostudio Olga Malleker.
+    name: 'WIRGES Bad & Heizung', wall: 'fachwerk', tint: '#ffffff', face: 'W', full: true, photos: ['wirges_schild'],
     draw(P) {
       const { W, top } = P, gf = P.full ? Math.min(SHOP_TOP, top) : top;   // Oberkante Erdgeschoss
       const f0 = 0.6, oH = Math.min(2.55, gf - 0.8), beam = '#262019';       // Erdgeschoss liegt über einer Treppe
@@ -265,13 +296,17 @@ export const MUCH_SHOPS = {
       P.window(0.36 * W, 0.5 * W, f0 + 0.12, oH, { frame: '#f1f1ee', t: 0.06, interior: 'empty' });
       P.window(0.67 * W, 0.795 * W, f0 + 0.12, oH, { frame: beam, t: 0.06, interior: 'poster' });
       P.rect(0.825 * W, 0.99 * W, -P.plinth, oH, '#2b2927');                  // dunkler Durchgang
-      P.slate(0, W, oH + 0.08, gf - 0.1);                                     // Schiefer-Vordach mit Schild darauf
+      P.slate(0, W, oH + 0.08, gf - 0.1);                                     // Schiefer-Vordach
       P.rect(0, W, gf - 0.1, gf, '#2b2e33');
-      P.board(0.08 * W, 0.66 * W, oH + 0.24, gf - 0.04, { bg: '#ffffff', border: '#d0d0cb' });
-      const sc = (oH + 0.24 + gf - 0.04) / 2;
-      P.run([['FOTO', '#3a3a3a', '800'], ['STUDIO', '#d81f26', '800']], 0.235 * W, sc - 0.09, 0.26, { maxW: 0.25 * W });
-      P.text('Olga Malleker', 0.52 * W, sc, 0.24, { color: '#1d1d1d', font: SCRIPT, maxW: 0.22 * W });
-      if (!P.full) return;
+      // Schild über dem Vordach, unter dem linken Fachwerkfenster: Foto (entzerrt), sonst Schriftzug als Platzhalter
+      const sign = (h0, h1) => {
+        const w = (h1 - h0) * 4.875, x0 = 0.097 * W, hh = h1 - h0;              // Seitenverhältnis des Schildes
+        if (P.photo('wirges_schild', x0, x0 + w, h0, h1)) return;
+        P.board(x0, x0 + w, h0, h1, { bg: '#30353a' });
+        P.text('WIRGES', x0 + w * 0.6, h0 + hh * 0.64, hh * 0.42, { color: '#ffffff', weight: '700', maxW: w * 0.7 });
+        P.text('Bad & Heizung GmbH', x0 + w * 0.6, h0 + hh * 0.24, hh * 0.17, { color: '#ffffff', maxW: w * 0.7 });
+      };
+      if (!P.full) { sign(oH + 0.12, gf - 0.12); return; }
       // Fachwerkgeschoss mit zwei Fenstern
       const sl = Math.max(gf + 2.6, Math.min(P.eave - 0.6, gf + 3.6));       // Unterkante des Schiefergiebels
       const w1 = sl - 0.45, w0 = w1 - 1.3, bw = 0.17;
@@ -283,6 +318,7 @@ export const MUCH_SHOPS = {
       for (const [a, b] of [[0.15, 0.26], [0.61, 0.75]]) {
         P.window(a * W + bw / 2, b * W - bw / 2, w0, w1, { frame: '#f4f4f2', t: 0.07, mullions: 1 });
       }
+      sign(gf + 0.1, Math.min(gf + 0.8, w0 - 0.05));
       // Schiefergiebel mit einem Fenster, über dem linken Fachwerkfenster – so weit innen, dass es unter die Dachkante passt
       P.slate(0, W, sl, top);
       P.rect(0, W, sl - 0.05, sl + 0.05, '#2a2e33');
@@ -446,6 +482,17 @@ function painter(g, W, top, plinth, seed, extra = {}) {
     W, top, plinth, rnd, rect, roofAt,
     full: !!extra.full,            // Front bedeckt die ganze Wand (Giebel inklusive)
     eave: extra.eave ?? top,       // Traufhöhe dieser Wand über Straßenniveau
+    /**
+     * Eigenes Foto (entzerrt, siehe loadShopPhotos) in den Bereich x0..x1, h0..h1 legen. down = Meter, um die
+     * die unterste Bildzeile nach unten verlängert wird (Sockel am Hang). false, wenn das Foto fehlt.
+     */
+    photo(name, x0 = 0, x1 = W, h0 = 0, h1 = top, down = 0) {
+      const img = PHOTOS.get(name);
+      if (!img) return false;
+      g.drawImage(img, X(x0), Y(h1), X(x1 - x0), (h1 - h0) * px);
+      if (down > 0) g.drawImage(img, 0, img.height - 2, img.width, 2, X(x0), Y(h0), X(x1 - x0), down * px);
+      return true;
+    },
     /** Putz mit leichter Körnung. */
     plaster(col, h0 = -plinth, h1 = top, x0 = 0, x1 = W) {
       rect(x0, x1, h0, h1, col);
@@ -632,7 +679,7 @@ function painter(g, W, top, plinth, seed, extra = {}) {
 
 /**
  * Alle Ladenfronten zeichnen und in einen Atlas packen.
- * items: [{ shop, width, top, plinth }] (Meter) → { canvas, rects: [{ u0, u1, vTop, vBot }] } (UV, wie flipY).
+ * items: [{ shop, width, top, plinth, photo? }] (Meter) → { canvas, rects: [{ u0, u1, vTop, vBot }] } (UV, wie flipY).
  */
 export function drawShopAtlas(items) {
   const PAD = 6, AW = 2048;
@@ -642,8 +689,13 @@ export function drawShopAtlas(items) {
     c.height = Math.max(8, Math.round((it.top + it.plinth) * SHOP_PX));
     const g = c.getContext('2d');
     g.fillStyle = '#eeeeea'; g.fillRect(0, 0, c.width, c.height);
-    try { it.shop.draw(painter(g, it.width, it.top, it.plinth, 977 + i * 7919, it)); }
-    catch (err) { console.warn('Ladenfront nicht gezeichnet:', it.shop.name, err); }
+    try {
+      const P = painter(g, it.width, it.top, it.plinth, 977 + i * 7919, it);
+      if (it.photo) {                // Foto der ganzen Wand; Putz darunter füllt Stellen, die das Foto nicht zeigt
+        P.plaster(it.shop.tint || '#f2f1ec');
+        P.photo(it.photo, 0, P.W, 0, P.top, P.plinth);
+      } else it.shop.draw(P);
+    } catch (err) { console.warn('Ladenfront nicht gezeichnet:', it.shop.name, err); }
     return c;
   });
   // Skyline-Packen: höchste Bilder zuerst, jedes an die niedrigste freie Stelle (hohe Giebelbilder lassen
