@@ -933,7 +933,9 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
   };
   let spawn = null, bestD = Infinity;
   const [shx, shz] = osm.spawnHint || [0, 0];         // gewünschter Startpunkt (z. B. Kirchplatz), sonst die Mitte
-  for (const l of osm.roadLines) {
+  // Mit spawnStreet nur auf Straßen dieses Namens suchen. Gibt es keine, dann wie bisher auf allen.
+  const named = osm.spawnStreet ? osm.roadLines.filter((l) => l.name === osm.spawnStreet) : [];
+  for (const l of (named.length ? named : osm.roadLines)) {
     const p = l.pts;
     for (let i = 0; i + 3 < p.length; i += 2) {
       const ax = p[i], az = p[i + 1], dx = p[i + 2] - ax, dz = p[i + 3] - az, len = Math.hypot(dx, dz) || 1e-6;
@@ -946,9 +948,9 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
     }
   }
   if (!spawn) spawn = { x: 0, z: 0 };
-  // Blick zum höchsten Gebäude in der Nähe des Starts (in Much: St. Martinus), sonst zur Mitte
+  // Blick zum vorgegebenen Ziel (spawnLook), sonst zum höchsten Gebäude in der Nähe des Starts, sonst zur Mitte
   const nearTall = tallBuildings.filter(b => Math.hypot(b.c[0] - spawn.x, b.c[1] - spawn.z) < 160).sort((a, b) => b.h - a.h)[0];
-  const look = nearTall ? nearTall.c : [0, 0];
+  const look = osm.spawnLook || (nearTall ? nearTall.c : [0, 0]);
   const ldx = look[0] - spawn.x, ldz = look[1] - spawn.z;
   spawn.yaw = Math.hypot(ldx, ldz) > 1 ? Math.atan2(-ldx, -ldz) : Math.PI;
 

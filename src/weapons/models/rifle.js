@@ -417,25 +417,27 @@ export function buildRifle() {
        * this same cylinder at build time; see Arm.fitToCylinder.
        */
       /**
-       * The wrist target is 8 mm CLOSER to the tube than the derivation above
-       * gives (14.5 mm of knuckle standoff -> 6.5 mm).
+       * Rabbit of Duty (22.11.2026): neue Haltung. Die Herleitungen oben gehören zur alten.
        *
-       * MEASURED with the build-time contact solve: at 14.5 mm the four fingertips
-       * landed 0.4-0.7 mm off the handguard — a real grip — but the PALM stood
-       * 29 mm clear of it, and the palm is the part of the support hand the camera
-       * actually sees. On screen that is a hand held next to the handguard with
-       * daylight behind it, which is precisely the "they float beside it with a
-       * visible gap" complaint, even though every fingertip is touching.
+       * Vorher lag das Handgelenk links neben dem Handschutz auf Laufhöhe. Die Finger zeigten
+       * nach rechts, die Hand war also gegen den Unterarm um rund 90 Grad abgeknickt. Im Bild
+       * sah das aus wie ein falsch herum gedrehtes Handgelenk, und der Ärmelabschluss stand
+       * wie eine Scheibe nach oben.
        *
-       * A 16 mm half-palm at 6.5 mm of standoff interpenetrates the tube by ~9 mm
-       * at the heel, which is what a glove does when it is squeezing something.
-       * The per-fingertip solve re-runs against this target at build time and just
-       * uses less curl, so the contact is preserved.
+       * Jetzt liegt die Hand UNTER dem Handschutz, mit der Handfläche nach oben. Die Finger
+       * zeigen schräg nach vorne-rechts-oben und greifen links herum. Damit setzt die Hand die
+       * Richtung des Unterarms fort, und der Unterarm kommt schräg von unten links ins Bild,
+       * wie in vielen Shootern. Dazu gehören der breitere Ärmel und der tiefere Ellbogen in
+       * viewmodel.js.
+       *   pos    = Handgelenk; die Handflächenmitte liegt etwa 2 cm links unter der Laufachse
+       *   back   = Handrücken nach unten, senkrecht zu finger
+       * Die Fingerkrümmung passt Arm.fitToCylinder beim Bauen weiter an den Handschutz an.
+       * arsenal.js (fitGrips) überträgt die Haltung auf die anderen Gewehre.
        */
       gripL: {
-        pos: [-0.1, 0.0734, handZ + 0.0252],
-        finger: [0.8977, -0.3267, -0.2955],
-        back: [-0.2784, -0.7648, 0.581],
+        pos: [-0.05, bore - 0.057, handZ + 0.036],
+        finger: [0.6, 0.35, -0.72],
+        back: [0.224, -0.937, -0.269],
       },
       /**
        * The handguard's collision profile, for the build-time fingertip contact

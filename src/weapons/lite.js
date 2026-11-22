@@ -9,9 +9,9 @@
 import * as THREE from 'three';
 import { bakeMasks } from './masks.js';
 import { WeaponMaterials } from './materials.js';
-import { Viewmodel } from './viewmodel.js?v=3';
+import { Viewmodel } from './viewmodel.js?v=4';
 import { WEAPON_DEFS } from './defs.js';
-import { buildRifle } from './models/rifle.js';
+import { buildRifle } from './models/rifle.js?v=2';
 import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
 import { Rng } from './rng.js';

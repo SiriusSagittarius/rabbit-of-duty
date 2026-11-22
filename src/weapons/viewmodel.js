@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Arm, HAND_POSES } from './hands.js';
+import { Arm, HAND_POSES } from './hands.js?v=2';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import {
@@ -127,12 +127,16 @@ export class Viewmodel {
     // fills half the screen. The support hand is therefore placed on the REAR of
     // the handguard instead, which buys the reach without moving the joint into
     // shot.
+    // Rabbit of Duty: beide Ärmel 1,6-mal so breit, damit sie nach demselben Kleidungsstück aussehen.
+    // Der linke Ellbogen sitzt tiefer und weiter außen, dadurch kommt der Unterarm schräg von unten
+    // links ins Bild statt quer hindurch. Die Griffhaltung dazu steht in rifle.js unter gripL.
     this.armR = new Arm(1, handMats, {
       scale: 1,
       shoulderX: 0.205,
       shoulderY: -0.2,
       shoulderZ: 0.06,
       pose: 'grip',
+      sleeveScale: 1.6,
     });
     // The shoulders stay BEHIND the eye. Blading the support shoulder forward to
     // reach the handguard was tried and measured: at z=-0.075 the 89 mm forearm
@@ -145,6 +149,8 @@ export class Viewmodel {
       shoulderY: -0.22,
       shoulderZ: 0.02,
       pose: 'clamp',
+      sleeveScale: 1.6,
+      pole: [-0.7, -0.7, 0.15],
     });
     this.rig.add(this.armR.root);
     this.rig.add(this.armL.root);

@@ -57,9 +57,9 @@ export class AudioManager {
       ['shot_tar21', './audio/sfx/schuss_sturmgewehr_hell_1.wav'],
       ['shot_kard', './audio/sfx/schuss_pistole_3.wav'],
       ['mag_out', './audio/sfx/magazin_raus.wav'],
-      ['mag_in', './audio/sfx/magazin_rein.wav'],
+      ['mag_in', './audio/reload.mp3'],             // Magazin rein (Pixabay, vom User; vorher sfx/magazin_rein.wav)
       ['bolt', './audio/sfx/verschluss_vor.wav'],
-      ['dry_fire', './audio/sfx/leer_klick.wav'],
+      ['dry_fire', './audio/empty1.mp3'],           // leer geschossen (Pixabay, vom User; vorher sfx/leer_klick.wav)
       ['knife', './audio/sfx/messer_ziehen.wav'],
       ['knife_slash', './audio/sfx/messer_schwung_1.wav'],
       ['knife_stab', './audio/sfx/messer_stich_1.wav'],

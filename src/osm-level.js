@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { pointInPoly, closestOnPoly } from './poly2d.js';
-import { buildNrwLevel } from './nrw-level.js?v=20';
+import { buildNrwLevel } from './nrw-level.js?v=21';
 import { makeLocalFrame } from './geo.js';
 
 /**
@@ -26,7 +26,12 @@ export const OSM_LOCATIONS = {
     label: 'Much, Hauptstraße bis Schulstraße',
     file: './assets/osm/much.json',
     center: [50.904981, 7.402773],      // Mitte des Ausschnitts: Zanderstraße (N) – Schulstraße (S), Zeitstraße-Kreisel (W) – Kirchplatz (O)
-    spawn: [50.90589, 7.40288],         // Start: Hauptstraße beim Rathaus (Gemeinde Much)
+    // Start auf der Hauptstraße am Westende der Ladenzeile, vor Hazal (Nr. 34) und der Tourist-Info (Nr. 33).
+    // Blick nach Osten die Straße entlang, an allen 18 Ladenfronten vorbei. Vorher stand hier das Rathaus.
+    // Die Startsuche nahm dann die nächstbeste Straße, und das war eine namenlose Zufahrt bei der Zanderstraße.
+    spawn: [50.9054155, 7.4056455],     // Spielfeld x 203, z -44
+    spawnStreet: 'Hauptstraße',         // Startpunkt nur auf Straßen dieses Namens (OSM name) suchen
+    spawnLook: [50.9054101, 7.407452],  // Blickziel x 330, z -41: Ostende der Ladenzeile
     style: 'village',
     nrw: './assets/nrw/much/',          // echtes Gelände + LoD2-Gebäude + Luftbild (tools/nrw_fetch.py)
   },
@@ -708,7 +713,8 @@ export async function buildOsmLevel(ctx, locationId = 'potsdamer') {
       const pts = lineOf(w); if (pts.length >= 4) roadLines.push({ pts, width, main: !!ROAD_W[hw] && hw !== 'pedestrian', name: w.tags.name || '' });
     }
     const spawnHint = loc.spawn ? toLocal(loc.spawn[0], loc.spawn[1]) : [0, 0];
-    const res = await buildNrwLevel(ctx, loc, { roadLines, spawnHint }, HELPERS);
+    const spawnLook = loc.spawnLook ? toLocal(loc.spawnLook[0], loc.spawnLook[1]) : null;
+    const res = await buildNrwLevel(ctx, loc, { roadLines, spawnHint, spawnStreet: loc.spawnStreet || '', spawnLook }, HELPERS);
     if (res || !isActive()) return res;
     flatFloor();                     // Rückfall: flache OSM-Kulisse
   }

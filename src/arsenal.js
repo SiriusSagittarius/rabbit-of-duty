@@ -4,10 +4,10 @@
 // ist dieselbe wie beim früheren Arsenal, damit main.js kaum angepasst werden musste.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { createViewmodel } from './weapons/lite.js?v=3';
+import { createViewmodel } from './weapons/lite.js?v=4';
 import { WEAPON_DEFS, buildRecoilPattern } from './weapons/defs.js';
 import { Rng } from './weapons/rng.js';
-import { buildRifle } from './weapons/models/rifle.js';
+import { buildRifle } from './weapons/models/rifle.js?v=2';
 import { buildSmg } from './weapons/models/smg.js';
 import { buildPistol } from './weapons/models/pistol.js';
 import { buildSniper } from './weapons/models/sniper.js';
@@ -27,6 +27,7 @@ const P = WEAPON_DEFS.pistol;
 // dieselben Handhaltungen, verschoben um den Abstand ihrer Griff-Oberkante bzw. ihres Handschutzes.
 const RIFLE_GRIP_TOP = [0, 0.035, 0.0];   // vordere Oberkante des Pistolengriffs im Grundgewehr
 const RIFLE_HG = { axisY: 0.075, r: 0.0271 };
+const RIFLE_HAND_Z = -0.235;              // handZ in rifle.js: wo die Knöchel der linken Hand den Handschutz kreuzen
 
 function fitGrips(model, ref, { gripTop, handZ }) {
   const n = model.nodes;
@@ -36,8 +37,10 @@ function fitGrips(model, ref, { gripTop, handZ }) {
   const axisY = hg ? hg.axis[1] : n.muzzle[1];
   const r = hg ? hg.r : RIFLE_HG.r;
   const gl = ref.nodes.gripL;
+  // Die linke Hand liegt unter dem Handschutz (rifle.js gripL). Bei einem dickeren Handschutz
+  // rutscht sie entsprechend tiefer. Zum Knöchelpunkt handZ steht sie wie beim Grundgewehr.
   n.gripL = {
-    pos: [gl.pos[0] - (r - RIFLE_HG.r), axisY + (gl.pos[1] - RIFLE_HG.axisY), handZ],
+    pos: [gl.pos[0], axisY + (gl.pos[1] - RIFLE_HG.axisY) - (r - RIFLE_HG.r), handZ + (gl.pos[2] - RIFLE_HAND_Z)],
     finger: gl.finger,
     back: gl.back,
   };
@@ -138,6 +141,9 @@ function weapon(id, name, cls, role, build, def, extra = {}) {
     id, name, class: cls, role, build, def,
     fireMode: 'auto', sound: 'rifle', camKick: 1,
     magazineSize: def.magSize, reserveAmmo: def.reserve, roundsPerMinute: def.rpm, damage: def.damage,
+    // Bild für die Waffenkammer: Seitenansicht des Spielmodells, gerendert mit Spielmaterialien
+    // (960 × 320, transparent). Eigenes Bild: Datei gleichen Namens ersetzen oder cardArt in extra setzen.
+    cardArt: `./ui/armory/${id}.webp`,
     ...extra,
   };
 }

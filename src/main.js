@@ -4,11 +4,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { Net } from './net.js?v=2';
-import { AudioManager } from './audio.js?v=4';
-import { Music } from './music.js?v=2';
-import { Arsenal, buildGrenadeMesh } from './arsenal.js?v=6';
+import { AudioManager } from './audio.js?v=5';
+import { Music } from './music.js?v=3';
+import { Arsenal, buildGrenadeMesh } from './arsenal.js?v=7';
+import { createBroom } from './broom.js?v=2';
 import { buildAtriumLevel } from './atrium-level.js?v=3';
-import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=22';
+import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=23';
 import { pointInPoly, closestOnPoly, segHitsPoly } from './poly2d.js';
 import { NavMap } from './navmap.js?v=3';
 import { loadPak } from './zombie-pak.js?v=1';
@@ -348,6 +349,7 @@ function carrot(x,z){
 
 function loadMap(mapId = 'much') {
   currentMapId = mapId;
+  broom.reset();
   localStorage.setItem('rod.map', mapId);
 
   // Vorherige Objekte aufräumen
@@ -618,6 +620,26 @@ function loadMap(mapId = 'much') {
   player.onGround = true;
   setTimeout(warmUpGpu, 0);         // nach dem Aufbau (OSM-/NRW-Karten wärmen nach dem Laden nochmals vor)
 }
+// Vor dem ersten loadMap() anlegen: loadMap, resetRun und gameOver räumen den Besen auf.
+// Flugbesen (Taste B, siehe broom.js). Die Ich-Ansicht ist das Bild des Users, ui/besen.webp.
+const broom = createBroom({
+  camera, audio, groundAt, player,
+  overlay: $('broomView'), help: $('broomHelp'),
+  onCast: (from) => hitscanShot(34, { from, color: '#8fe3ff', thick: 1.8, worldColor: '#8fe3ff', life: 0.14 }),
+});
+function toggleBroom() {
+  if (state !== 'playing') return;
+  if (mpActive) { showBanner('BESEN NUR IM EINZELSPIEL'); return; }
+  if (broom.active) {
+    player.vy = THREE.MathUtils.clamp(broom.dismount(), -4, 4);   // weiterfallen statt in der Luft stehen
+    player.onGround = false;
+  } else {
+    if (stance !== 'stand') setStance('stand');
+    firing = false; ads = false; arsenal.setTrigger(false);
+    broom.mount();
+  }
+}
+
 loadMap(currentMapId);
 
 // ----------------------------------------------------------------------------
@@ -639,44 +661,7 @@ const arsenal = new Arsenal({
     recoil.x += kp; recoil.y += ky;
     pitch += recoil.x * 0.35;
 
-    // Raycast aus Bildschirmmitte
-    ray.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const foes = mpActive ? remoteHitboxes : enemyMeshes;
-    const hitsE = ray.intersectObjects(foes, false);
-    const hitsW = ray.intersectObjects(worldColliders, true);
-    let eHit = hitsE[0]; const wHit = hitsW[0];
-    // Strahl trifft denselben Gegner knapp dahinter auch am Kopf (z. B. vorgebeugt) → Kopftreffer zählt
-    if (eHit && !eHit.object.userData.isHead) {
-      const hh = hitsE.find(h => h.object.userData.isHead && h.object.userData.enemyRef === eHit.object.userData.enemyRef && h.distance - eHit.distance < 0.4);
-      if (hh) eHit = hh;
-    }
-    let end;
-    if (eHit && (!wHit || eHit.distance < wHit.distance)) {
-      end = eHit.point;
-      if (eHit.object.userData.remoteId) {
-        net.sendHit(eHit.object.userData.remoteId, MP_HIT_DMG);
-        impact(end, '#ff6a5a', 12);
-        showHitmarker(false);
-        audio.hit(true);
-      } else {
-        const e = eHit.object.userData.enemyRef?.userData.rec;
-        const head = !!eHit.object.userData.isHead || (eHit.object.geometry?.type === 'SphereGeometry' && eHit.object.position.y > 1.4);
-        const dmg = def.damage || 35;
-        if (e && !e.dead) damageEnemy(e, head ? dmg * 2.2 : dmg, head);
-        impact(end, '#ff6a5a', 12);
-        showHitmarker(head);
-        audio.hit(true);
-      }
-    } else if (wHit) {
-      end = wHit.point;
-      impact(end, '#ffcf7a', 8);
-      audio.hit(false);
-    } else {
-      end = ray.ray.at(120, new THREE.Vector3());
-    }
-
-    const muzzle = camera.position.clone().addScaledVector(fwd, 0.4);
-    tracer(muzzle, end);
+    const muzzle = hitscanShot(def.damage || 35);
 
     if (mpActive && net.connected) {
       const dir = new THREE.Vector3();
@@ -686,6 +671,51 @@ const arsenal = new Arsenal({
     updateAmmo();
   }
 });
+
+/**
+ * Treffer-Strahl aus der Bildschirmmitte, für die Waffen und den Zauber des Flugbesens.
+ * Trifft den nächsten Gegner (Kopf zählt 2,2-fach; im Mehrspieler die Mitspieler) oder die Welt,
+ * zeichnet Einschlag und Leuchtspur und gibt den Startpunkt der Spur zurück.
+ * o: { from, color, thick, worldColor }
+ */
+function hitscanShot(dmg, o = {}) {
+  ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const foes = mpActive ? remoteHitboxes : enemyMeshes;
+  const hitsE = ray.intersectObjects(foes, false);
+  const hitsW = ray.intersectObjects(worldColliders, true);
+  let eHit = hitsE[0]; const wHit = hitsW[0];
+  // Strahl trifft denselben Gegner knapp dahinter auch am Kopf (z. B. vorgebeugt) → Kopftreffer zählt
+  if (eHit && !eHit.object.userData.isHead) {
+    const hh = hitsE.find(h => h.object.userData.isHead && h.object.userData.enemyRef === eHit.object.userData.enemyRef && h.distance - eHit.distance < 0.4);
+    if (hh) eHit = hh;
+  }
+  let end;
+  if (eHit && (!wHit || eHit.distance < wHit.distance)) {
+    end = eHit.point;
+    if (eHit.object.userData.remoteId) {
+      net.sendHit(eHit.object.userData.remoteId, MP_HIT_DMG);
+      impact(end, '#ff6a5a', 12);
+      showHitmarker(false);
+      audio.hit(true);
+    } else {
+      const e = eHit.object.userData.enemyRef?.userData.rec;
+      const head = !!eHit.object.userData.isHead || (eHit.object.geometry?.type === 'SphereGeometry' && eHit.object.position.y > 1.4);
+      if (e && !e.dead) damageEnemy(e, head ? dmg * 2.2 : dmg, head);
+      impact(end, '#ff6a5a', 12);
+      showHitmarker(head);
+      audio.hit(true);
+    }
+  } else if (wHit) {
+    end = wHit.point;
+    impact(end, o.worldColor || '#ffcf7a', 8);
+    audio.hit(false);
+  } else {
+    end = ray.ray.at(120, new THREE.Vector3());
+  }
+  const from = o.from ? o.from.clone() : camera.position.clone().addScaledVector(fwd, 0.4);
+  tracer(from, end, o.color, o.thick, o.life);
+  return from;
+}
 
 // ----------------------------------------------------------------------------
 // FX: Tracer + Impact-Partikel  (kleiner Pool)
@@ -697,12 +727,13 @@ const tracerPool = [];
 for(let i=0;i<24;i++){ const m=new THREE.Mesh(tracerGeo, new THREE.MeshBasicMaterial({ color:'#ffd98a', transparent:true, opacity:0, fog:false }));
   m.visible=false; m.renderOrder=5; m.userData.life=0; scene.add(m); tracerPool.push(m); }
 let tracerIdx=0;
-function tracer(from, to){
+function tracer(from, to, color = '#ffd98a', thick = 1, life = 0.08){   // Besen-Zauber: blau, breiter, leuchtet länger
   const m = tracerPool[tracerIdx=(tracerIdx+1)%tracerPool.length];
   const dir = new THREE.Vector3().subVectors(to,from); const len = dir.length()||0.001;
   m.position.copy(from).addScaledVector(dir,0.5);
   m.quaternion.setFromUnitVectors(UP, dir.multiplyScalar(1/len));
-  m.scale.set(1,len,1); m.material.opacity=0.9; m.visible=true; m.userData.life=0.08;
+  m.material.color.set(color);
+  m.scale.set(thick,len,thick); m.material.opacity=0.9; m.visible=true; m.userData.life=life;
 }
 // Impact-Pool: feste Anzahl Points-Objekte, wiederverwendet
 const SPARK_N=18; const sparkPool=[];
@@ -736,7 +767,11 @@ const outlineMat = new THREE.MeshBasicMaterial({ color:'#ffcf9a', side:THREE.Bac
 
 function outlineShell(mesh, scale=1.07){ const o=new THREE.Mesh(mesh.geometry, outlineMat); o.scale.setScalar(scale); mesh.add(o); }
 // Gegner-Typen: Verschiedene Rollen (Klassische Söldner vs. wilde gefräßige Zombies)
-let gameMode = localStorage.getItem('rod.gameMode') || 'classic'; // 'classic' | 'zombies'
+// Der Söldner-Modus ist vorerst ausgeblendet. Der User hat am 22.11.2026 gesagt: „verstecke den Söldnermodus,
+// wir machen da später noch was“. Der Code bleibt vollständig. Mit true kommen die Modus-Wahl im Startmenü,
+// die Umschalter in Pause und Game Over und die Söldner-Spalte der Bestenliste zurück.
+const SOELDNER_SICHTBAR = false;
+let gameMode = SOELDNER_SICHTBAR ? (localStorage.getItem('rod.gameMode') || 'classic') : 'zombies'; // 'classic' | 'zombies'
 
 function pickEnemyType(){
   if (gameMode === 'zombies') {
@@ -1169,6 +1204,12 @@ function onCratePickup() {
 
 function updateAmmo() {
   const w = arsenal.currentWeapon;
+  if (broom.active) {                       // Zauber vom Besen brauchen keine Munition
+    ui.ammoNum.textContent = '✦';
+    ui.ammoRes.textContent = '∞';
+    ui.reloadHint.classList.remove('on');
+    return;
+  }
   if (w && w.melee) {
     ui.ammoNum.textContent = '⚔️';
     ui.ammoRes.textContent = '∞';
@@ -1184,7 +1225,7 @@ function updateAmmo() {
 function updateWeaponHud() {
   const w = arsenal.currentWeapon;
   if (ui.weaponName && w) {
-    ui.weaponName.textContent = w.name;
+    ui.weaponName.textContent = broom.active ? 'Flugbesen' : w.name;
   }
 }
 
@@ -1311,6 +1352,9 @@ addEventListener('keydown', e=>{
   if (nav?.isOpen) { navMapKey(e); return; }            // Karte offen: nur Kartentasten
   if ((e.code === 'KeyN' || e.code === 'Tab') && state === 'playing') { e.preventDefault(); openNavMap(); return; }
   keys[e.code]=true;
+  if (e.code === 'KeyB') { toggleBroom(); return; }
+  // Auf dem Besen: keine Waffen- und Haltungstasten (C und Strg heißen dort sinken)
+  if (broom.active && /^(KeyR|Digit[12]|KeyE|KeyV|KeyC|KeyX|KeyY|KeyZ|ControlLeft|ControlRight)$/.test(e.code)) return;
   if(e.code==='KeyR') arsenal.reload();
   if(e.code==='Digit1') { arsenal.switchSlot('primary'); updateAmmo(); updateWeaponHud(); }
   if(e.code==='Digit2') { arsenal.switchSlot('secondary'); updateAmmo(); updateWeaponHud(); }
@@ -1326,6 +1370,7 @@ addEventListener('keyup', e=>{ keys[e.code]=false; });
 
 addEventListener('wheel', e => {
   if (document.pointerLockElement !== canvas) return;
+  if (broom.active) { broom.wheel(e.deltaY < 0 ? 1 : -1); return; }   // hoch = Spirale nach vorne, runter = nach hinten
   arsenal.toggleSlot();
   updateAmmo();
   updateWeaponHud();
@@ -1348,6 +1393,11 @@ addEventListener('mousemove', e=>{
 });
 addEventListener('mousedown', e=>{
   if(document.pointerLockElement!==canvas) return;
+  if (broom.active) {                     // Besen: links = Zauber, Mitte (Maus 3) = Schub
+    if (e.button === 0) broom.fire(true);
+    if (e.button === 1) { e.preventDefault(); broom.setThrust(true); }
+    return;
+  }
   if(e.button===0) {
     if (arsenal.currentWeapon?.melee) {
       meleeAttack();
@@ -1359,7 +1409,8 @@ addEventListener('mousedown', e=>{
   if(e.button===2) ads=true;
 });
 addEventListener('mouseup', e=>{
-  if(e.button===0) { firing=false; arsenal.setTrigger(false); }
+  if(e.button===0) { firing=false; arsenal.setTrigger(false); broom.fire(false); }
+  if(e.button===1) broom.setThrust(false);
   if(e.button===2) ads=false;
 });
 addEventListener('contextmenu', e=>e.preventDefault());
@@ -1535,6 +1586,7 @@ function quit(){
 }
 function restart(){ resetRun(); state='ready'; setOverlay(); }
 function resetRun(){
+  broom.reset();
   for(const e of enemies){
     if (e.mixer) e.mixer.stopAllAction();
     scene.remove(e.g);
@@ -1639,7 +1691,7 @@ const fwd = new THREE.Vector3(), right = new THREE.Vector3(), tmp = new THREE.Ve
 let stepTimer = 0;
 function update(dt){
   // Blickrichtung
-  camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  camera.rotation.set(pitch, yaw, broom.active ? broom.roll : 0, 'YXZ');   // auf dem Besen mit Schräglage und Spirale
   recoil.x *= Math.pow(0.001,dt); recoil.y *= Math.pow(0.001,dt);
 
   // Bewegung
@@ -1651,83 +1703,91 @@ function update(dt){
   if(keys['KeyD']) tmp.add(right); if(keys['KeyA']) tmp.sub(right);
   const moving = tmp.lengthSq()>0; if(moving) tmp.normalize();
 
-  // Sprinten bricht Ducken / Liegen automatisch ab (taktischer Stand-Sprint)
-  if (sprint && moving && stance !== 'stand') {
-    setStance('stand');
-  }
-
-  // Geschwindigkeitsanpassung je nach Haltung
   let speed = 5.2;
-  if (stance === 'crouch') {
-    speed = 3.1;
-  } else if (stance === 'prone') {
-    speed = 1.65;
-  } else if (sprint) {
-    speed = 8.5;
-  }
-  camera.position.addScaledVector(tmp, speed*dt);
-
-  // Weiche Körpergrößen-Interpolation (Stehen 1.70m <-> Ducken 1.08m <-> Liegen 0.45m)
-  const prevH = player.height;
-  player.height = THREE.MathUtils.lerp(player.height, player.targetHeight, 14 * dt);
-  camera.position.y += (player.height - prevH);
-
-  // Schrittgeräusche (Einzelschritte je Untergrund, Oberflächenerkennung)
-  const currentSurface = (currentMapId === 'desert') ? 'sand' : 'concrete';
-  if (moving && player.onGround) {
-    stepTimer -= dt;
-    if (stepTimer <= 0) {
-      stepTimer = (stance === 'prone') ? 0.65 : (stance === 'crouch') ? 0.52 : (sprint ? 0.28 : 0.42);
-      audio.step(sprint && stance === 'stand', currentSurface);
-    }
+  if (broom.active) {
+    // Flugbesen: eigene Flugphysik (broom.js), danach dieselbe Kollision wie zu Fuß
+    broom.update(dt, { yaw, pitch, forward: !!keys['KeyW'], brake: !!keys['KeyS'], left: !!keys['KeyA'], right: !!keys['KeyD'],
+      up: !!keys['Space'], down: !!(keys['KeyC'] || keys['ControlLeft'] || keys['ControlRight']) });
+    player.vy = 0; player.onGround = false;
   } else {
-    stepTimer = 0.05;
-  }
-
-  // Antigravity-Auftriebszonen & Schwerkraft
-  let inLift = false;
-  const currentFootY = camera.position.y - player.height;
-  for (const lz of liftZones) {
-    if (camera.position.x >= lz.minX && camera.position.x <= lz.maxX &&
-        camera.position.z >= lz.minZ && camera.position.z <= lz.maxZ &&
-        currentFootY >= lz.minY - 0.2 && currentFootY <= lz.maxY) {
-      inLift = true;
-      // Sanfter Antigravity-Auftrieb nach oben
-      player.vy = THREE.MathUtils.lerp(player.vy, lz.liftForce || 9.5, 7 * dt);
-      player.onGround = false;
-      if (Math.random() < 0.04) audio.antigrav();
-      break;
-    }
-  }
-
-  // Schwerkraft / Sprung
-  if(keys['Space'] && player.onGround){
-    if (stance !== 'stand') {
+    // Sprinten bricht Ducken / Liegen automatisch ab (taktischer Stand-Sprint)
+    if (sprint && moving && stance !== 'stand') {
       setStance('stand');
-      keys['Space'] = false; // Aufstehen statt direktem Hochspringen
-    } else {
-      player.vy = 6.2;
-      player.onGround = false;
-      audio.jump();
     }
-  }
-  if (!inLift) {
-    player.vy -= 18*dt;
-  }
-  camera.position.y += player.vy*dt;
 
-  // Mehrstöckige Landekollision auf Galerie-Etagen
-  const targetFloorY = getFloorHeight(camera.position.x, camera.position.z, camera.position.y - player.height);
-  if(camera.position.y <= targetFloorY + player.height){
-    camera.position.y = targetFloorY + player.height;
-    player.vy = 0;
-    if(!player.onGround){ audio.land(currentSurface); }
-    player.onGround = true;
-  } else if (player.onGround && player.vy <= 0 && camera.position.y - player.height - targetFloorY < 0.5) {
-    camera.position.y = targetFloorY + player.height;   // Hang/Stufe abwärts: am Boden kleben statt kurz abzuheben
-    player.vy = 0;
-  } else {
-    if (player.vy < -0.5) player.onGround = false;
+    // Geschwindigkeitsanpassung je nach Haltung
+    speed = 5.2;
+    if (stance === 'crouch') {
+      speed = 3.1;
+    } else if (stance === 'prone') {
+      speed = 1.65;
+    } else if (sprint) {
+      speed = 8.5;
+    }
+    camera.position.addScaledVector(tmp, speed*dt);
+
+    // Weiche Körpergrößen-Interpolation (Stehen 1.70m <-> Ducken 1.08m <-> Liegen 0.45m)
+    const prevH = player.height;
+    player.height = THREE.MathUtils.lerp(player.height, player.targetHeight, 14 * dt);
+    camera.position.y += (player.height - prevH);
+
+    // Schrittgeräusche (Einzelschritte je Untergrund, Oberflächenerkennung)
+    const currentSurface = (currentMapId === 'desert') ? 'sand' : 'concrete';
+    if (moving && player.onGround) {
+      stepTimer -= dt;
+      if (stepTimer <= 0) {
+        stepTimer = (stance === 'prone') ? 0.65 : (stance === 'crouch') ? 0.52 : (sprint ? 0.28 : 0.42);
+        audio.step(sprint && stance === 'stand', currentSurface);
+      }
+    } else {
+      stepTimer = 0.05;
+    }
+
+    // Antigravity-Auftriebszonen & Schwerkraft
+    let inLift = false;
+    const currentFootY = camera.position.y - player.height;
+    for (const lz of liftZones) {
+      if (camera.position.x >= lz.minX && camera.position.x <= lz.maxX &&
+          camera.position.z >= lz.minZ && camera.position.z <= lz.maxZ &&
+          currentFootY >= lz.minY - 0.2 && currentFootY <= lz.maxY) {
+        inLift = true;
+        // Sanfter Antigravity-Auftrieb nach oben
+        player.vy = THREE.MathUtils.lerp(player.vy, lz.liftForce || 9.5, 7 * dt);
+        player.onGround = false;
+        if (Math.random() < 0.04) audio.antigrav();
+        break;
+      }
+    }
+
+    // Schwerkraft / Sprung
+    if(keys['Space'] && player.onGround){
+      if (stance !== 'stand') {
+        setStance('stand');
+        keys['Space'] = false; // Aufstehen statt direktem Hochspringen
+      } else {
+        player.vy = 6.2;
+        player.onGround = false;
+        audio.jump();
+      }
+    }
+    if (!inLift) {
+      player.vy -= 18*dt;
+    }
+    camera.position.y += player.vy*dt;
+
+    // Mehrstöckige Landekollision auf Galerie-Etagen
+    const targetFloorY = getFloorHeight(camera.position.x, camera.position.z, camera.position.y - player.height);
+    if(camera.position.y <= targetFloorY + player.height){
+      camera.position.y = targetFloorY + player.height;
+      player.vy = 0;
+      if(!player.onGround){ audio.land(currentSurface); }
+      player.onGround = true;
+    } else if (player.onGround && player.vy <= 0 && camera.position.y - player.height - targetFloorY < 0.5) {
+      camera.position.y = targetFloorY + player.height;   // Hang/Stufe abwärts: am Boden kleben statt kurz abzuheben
+      player.vy = 0;
+    } else {
+      if (player.vy < -0.5) player.onGround = false;
+    }
   }
   collide(camera.position);
 
@@ -1747,9 +1807,11 @@ function update(dt){
   const currentWpn = arsenal.currentWeapon;
   const isSniper = Boolean(currentWpn?.scope);
   const zoomFov = currentWpn?.scope?.zoomFov || 15;
-  const targetFov = ads
-    ? (isSniper ? zoomFov : 50)
-    : (sprint && moving ? 82 : 75);
+  const targetFov = broom.active
+    ? 75 + 14 * broom.speedFrac + broom.spiralFov       // Besen: weiteres Sichtfeld bei hoher Fahrt und in der Spirale
+    : ads
+      ? (isSniper ? zoomFov : 50)
+      : (sprint && moving ? 82 : 75);
 
   camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.001, dt));
   camera.updateProjectionMatrix();
@@ -1783,9 +1845,9 @@ function update(dt){
   arsenal.update(dt, {
     speed,
     grounded: player.onGround,
-    sprinting: sprint && moving && !ads && stance === 'stand',
+    sprinting: sprint && moving && !ads && stance === 'stand' && !broom.active,
     moving,
-    aiming: ads
+    aiming: ads && !broom.active
   });
   updateAmmo();
   updateWeaponHud();
@@ -1958,6 +2020,7 @@ function update(dt){
 
 function gameOver(){
   state='over'; document.exitPointerLock(); setOverlay();
+  broom.reset();
   ui.finalScore.textContent=score;
   const isZ = (gameMode === 'zombies');
   const finalKillsEl = $('finalKills');
@@ -2021,7 +2084,7 @@ function openHighscoreModal(){
   $('hsModalMsg').textContent = 'Lade …';
   const lists = { classic: $('hsListClassic'), zombies: $('hsListZombies') };
   let failed = 0;
-  for (const mode of ['classic', 'zombies']) {
+  for (const mode of (SOELDNER_SICHTBAR ? ['classic', 'zombies'] : ['zombies'])) {
     lists[mode].replaceChildren();
     fetchTop(currentMapId, mode)
       .then(d => { renderTop(lists[mode], d.top); if (!d.top.length) lists[mode].innerHTML = '<li class="empty">Noch keine Einträge</li>'; })
@@ -2202,6 +2265,7 @@ function toggleMusic() {
 }
 
 function setGameMode(mode) {
+  if (!SOELDNER_SICHTBAR) mode = 'zombies';            // Söldner ausgeblendet: immer Zombie-Überleben
   gameMode = (mode === 'zombies') ? 'zombies' : 'classic';
   localStorage.setItem('rod.gameMode', gameMode);
 
@@ -2266,6 +2330,15 @@ function setupGameModeAndMusicListeners() {
     setGameMode(gameMode === 'zombies' ? 'classic' : 'zombies');
     restart();
   });
+  if (!SOELDNER_SICHTBAR) {
+    // Nur Zombie-Überleben: Modus-Wahl, Umschalter und die Söldner-Spalte der Bestenliste ausblenden
+    for (const id of ['modeHeader', 'modeButtons', 'pauseModeBtn', 'gameOverModeBtn']) {
+      const el = $(id);
+      if (el) el.style.display = 'none';
+    }
+    const col = $('hsListClassic')?.parentElement;
+    if (col) { col.style.display = 'none'; col.parentElement.style.gridTemplateColumns = '1fr'; }
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -2300,6 +2373,7 @@ function frame(now){
   const dt = Math.min(0.05, (now-last)/1000); last=now;
   if(state==='playing') update(dt);
   else {
+    broom.quiet();                                   // Pause/Menü: Flugwind aus
     for (const e of enemies) {
       if (e.mixer) e.mixer.update(dt);
     }
@@ -2321,7 +2395,7 @@ function renderFrame(){
   try {
     renderer.clear();
     renderer.render(scene, camera);
-    arsenal.render(renderer);
+    if (!broom.active) arsenal.render(renderer);    // auf dem Besen halten die Hände den Besen (Bild), keine Waffe
   } finally { gpuTimerEnd(q); }
   adaptResolution();
 }
@@ -2478,6 +2552,19 @@ function setupArmoryUI() {
     }
   }
 
+  // Anzahl aus dem Katalog zählen, damit sie zu den Karten passt. Eine GLB-Waffe, deren Datei
+  // fehlt, ist dort als unavailable markiert und zählt nicht mit.
+  function updateCounts() {
+    const prim = arsenal.weaponsOfClass('primary');
+    const sec = arsenal.weaponsOfClass('secondary');
+    const guns = [...prim, ...sec].filter((w) => !w.melee).length;
+    const melee = prim.length + sec.length - guns;
+    const countEl = $('armoryCount');
+    if (countEl) countEl.textContent = `(${guns} WAFFEN${melee ? ' & NAHKAMPF' : ''})`;
+    if (tabPrimary) tabPrimary.textContent = `Primärwaffen (${prim.length})`;
+    if (tabSecondary) tabSecondary.textContent = `Sekundär & Nahkampf (${sec.length})`;
+  }
+
   function renderGrid() {
     grid.innerHTML = '';
     tabPrimary.style.background = currentTab === 'primary' ? 'var(--accent)' : 'transparent';
@@ -2507,7 +2594,7 @@ function setupArmoryUI() {
         card.onmouseenter = () => { if (!isEquipped) card.style.borderColor = 'rgba(255,255,255,0.4)'; };
         card.onmouseleave = () => { if (!isEquipped) card.style.borderColor = 'rgba(255,255,255,0.1)'; };
 
-        const img = w.cardArt ? `<img src="${w.cardArt}" style="width:100%;height:80px;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.6))" />` : '';
+        const img = w.cardArt ? `<img src="${w.cardArt}" alt="" onerror="this.remove()" style="width:100%;height:80px;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.6))" />` : '';
         card.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-weight:900;font-size:1.1rem;color:${isEquipped ? 'var(--accent)' : '#fff'}">${w.name}</span>
@@ -2555,6 +2642,7 @@ function setupArmoryUI() {
     if (ev) ev.stopPropagation();
     modal.style.display = 'flex';
     updateStatus();
+    updateCounts();
     renderGrid();
   };
 
@@ -2916,6 +3004,7 @@ $('mpBtn').addEventListener('click', async (ev)=>{
   try { await net.connect(url, 'Hase'); }
   catch(err){ console.error('[net] connect failed', err); $('mpStatus').textContent='Server nicht erreichbar — läuft server/ (npm start)?'; return; }
   mpActive=true; mpFrozen=false; mpSpawned=false; frags=0; lastMyHp=100;
+  broom.reset();                       // Besen gibt es nur im Einzelspiel
   for(let i=enemies.length-1;i>=0;i--) scene.remove(enemies[i].g); enemies.length=0; enemyMeshes.length=0; aliveTarget=1;  // KI-Wellen aus
   player.hp=100; updateHealth(); $('fragsNum').textContent='0'; $('frags').style.display='block';
   $('mpStatus').textContent=''; audio.ensure(); lock();
@@ -2924,7 +3013,7 @@ $('mpBtn').addEventListener('click', async (ev)=>{
 // Debug-Hook für Screenshot-Automatik & Tests
 window.__ROD__ = {
   camera, scene, renderer, arsenal, audio, music, player, damageFeedback, meleeAttack,
-  crates, gameOver,
+  crates, gameOver, broom,
   get grenades(){return grenades;},
   get score(){return score;},
   set score(v){ score = v; updateScore(); },

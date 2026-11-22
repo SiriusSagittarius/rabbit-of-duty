@@ -11,10 +11,10 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
 
 ### Spiel
 
-- **Zwei Modi:**
-  - *Klassisch* gegen Soldaten (Späher, Schwerer Soldat, Sturmsoldat).
-  - *Zombies* (Wilder Zombie, Verwesender Zombie, Gefräßiger Koloss).
-  - Die Gegner kommen in Wellen. Punkte und Combos zählen.
+- **Zombie-Überleben:** Wilder Zombie, Verwesender Zombie und Gefräßiger Koloss kommen in Runden. Punkte und
+  Combos zählen.
+  - Ein zweiter Modus gegen Soldaten (Späher, Schwerer Soldat, Sturmsoldat) steckt im Code. Er ist vorerst
+    ausgeblendet, `SOELDNER_SICHTBAR` in `src/main.js` schaltet ihn wieder ein.
 - **Munitionskisten:** Im Einzelspiel taucht immer wieder eine Kiste in der Nähe auf, erkennbar an einer Lichtsäule
   und einem gelben Punkt auf dem Radar. Drüberlaufen füllt die Reserve aller Waffen auf und bringt eine Granate.
 - **Bestenliste:** Am Ende einer Runde trägst du dich mit deinem Namen ein, getrennt nach Karte und Modus. Im Menü
@@ -25,6 +25,9 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
   - Zielen über Kimme und Korn, Rotpunkt oder Zielfernrohr.
   - Rückstoßmuster, Nachladen mit Animation, Nahkampf.
 - **Bewegung:** sprinten, springen, ducken, hinlegen.
+- **Flugbesen:** Mit **B** rufst du im Einzelspiel den Besen und fliegst, wohin du schaust, auch über die Dächer
+  von Muchtown. Schub gibt die mittlere Maustaste oder W. Das Mausrad dreht eine Spirale nach vorne oder hinten,
+  und mit Linksklick zauberst du. Gebäude halten dich auf, über den Dächern ist frei.
 - **Karte und Navi:** Ziel auf der Karte anklicken, dann der Leuchtlinie am Boden folgen. Die Route führt bevorzugt
   über Straßen und Wege, mit Abbiegehinweisen und auf Wunsch mit Sprachansage.
 - **Mehrspieler:** 1 gegen 1 im Heimnetz über einen kleinen Server (siehe unten).
@@ -120,8 +123,21 @@ eigenen Rekord.
 | E oder V | Nahkampf (Messer bzw. Stoß mit der Waffe) |
 | G | Granate werfen |
 | N oder Tab | Karte und Navi |
+| B | Flugbesen rufen oder absteigen (nur im Einzelspiel) |
 | M | Musik an oder aus |
 | Esc | Pause |
+
+Auf dem Besen:
+
+| Taste | Aktion |
+|---|---|
+| Maus | lenken (man fliegt in Blickrichtung) |
+| mittlere Maustaste oder W | Schub |
+| S | bremsen |
+| A / D | seitlich |
+| Leertaste / C oder Strg | steigen / sinken |
+| Mausrad hoch / runter | Spirale nach vorne / nach hinten |
+| Linksklick | zaubern |
 
 ## Projektaufbau
 
@@ -136,11 +152,12 @@ eigenen Rekord.
 | `src/navmap.js` | Karte und Navi |
 | `src/zombie-pak.js` | öffnet das verschlüsselte Zombie-Paket |
 | `src/pickups.js` | Munitionskisten |
+| `src/broom.js` | Flugbesen: Flugphysik, Spirale, Zauber, Fluggeräusch |
 | `src/highscore.js` | Bestenliste: Abruf und Eintragen beim Server |
 | `src/music.js`, `audio/` | Musik und Soundeffekte |
 | `src/net.js`, `server/` | Mehrspieler mit Colyseus und die Bestenliste (`server/src/highscores.ts`) |
 | `assets/` | Kartendaten (`nrw/`, `osm/`), Modelle und Sounds |
-| `ui/` | Vorschaubilder der Karten |
+| `ui/` | Vorschaubilder der Karten (`maps/`) und Waffen (`armory/`), Bild des Flugbesens |
 | `tools/` | Werkzeuge für Kartendaten, Sounds und das Zombie-Modell (Python, Packen mit Node) |
 | `vendor/three/` | Three.js |
 
@@ -235,7 +252,10 @@ Auf einen Webserver gehören nur `assets/models/zombie/zombie.pak` und `zombie.k
 | Spielmusik (`audio/hauptspiel.wav`) | Ausschnitt aus „Del Rio Bravo“ von Kevin MacLeod, CC BY 3.0 (Hinweis siehe unten) | ja |
 | Menümusik (`audio/astronaut12-…-301131.mp3`) | „Energy Gaming Electro Trap …“ von astronaut12, Pixabay Content License | ja |
 | Sprung-Sound (`assets/audio/jump.mp3`) | Pixabay Content License | ja |
+| Fluggeräusch des Besens (`audio/blow.mp3`), Nachladen (`audio/reload.mp3`), Leer-Klick (`audio/empty1.mp3`) | Pixabay Content License | ja |
 | Soundeffekte (`audio/free/`, `audio/sfx/`) | freesound.org, CC0, plus eigene Synthese; Liste mit Links in `audio/free/text.md` und `audio/sfx/QUELLEN.txt` | ja |
+| Flugbesen in der Hand (`ui/besen.webp`) | eigenes Bild, erstellt mit Gemini (Google) | ja |
+| Waffenbilder der Waffenkammer (`ui/armory/`) | aus den Waffenmodellen des Spiels gerendert | ja |
 | Mehrspieler (`server/`, Client von esm.sh) | Colyseus, MIT | Server ja |
 | Zombie-Modell | „Zombie free VR / AR / low-poly“ von dremorn (CGTrader), Royalty Free License | nein, selbst laden |
 
