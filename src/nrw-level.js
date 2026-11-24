@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { pointInPoly, closestOnPoly } from './poly2d.js';
-import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=10';
+import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=11';
 import { buildMuchLandmarks, muchWallTextures } from './much-landmarks.js?v=1';
 
 /**
@@ -407,9 +407,11 @@ const FACE_DIR = { N: [0, -1], S: [0, 1], O: [1, 0], E: [1, 0], W: [-1, 0] };   
  * near = [x, z] in Spielkoordinaten, bevorzugt die Wand nahe diesem Punkt (Häuser mit mehreren Straßenwänden).
  * jog = größter Vor- oder Rücksprung (m), bis zu dem anschließende Wandstücke zur Front gehören (Standard 0,6);
  * die Front steht vor dem vordersten Stück, Seitenteile schließen die Lücke.
+ * gap = größte Lücke (m) entlang der Front zwischen zwei Stücken (Standard 0,5) – größer, wenn schräge Erkerwände
+ * dazwischenliegen.
  */
 function streetFront(b, roads, opt = {}) {
-  const jog = opt.jog ?? 0.6;
+  const jog = opt.jog ?? 0.6, gap = opt.gap ?? 0.5;
   const walls = [];
   for (const p of b.w) {
     const nrm = newell(p);
@@ -466,7 +468,7 @@ function streetFront(b, roads, opt = {}) {
       if (Math.abs(off - best.off) > jog) continue;
       const ua = w.ax * F.rx + w.az * F.rz, ub = w.bx * F.rx + w.bz * F.rz;
       const wu0 = Math.min(ua, ub), wu1 = Math.max(ua, ub);
-      if (wu1 < F.u0 - 0.5 || wu0 > F.u1 + 0.5 || (wu0 >= F.u0 - 0.01 && wu1 <= F.u1 + 0.01)) continue;
+      if (wu1 < F.u0 - gap || wu0 > F.u1 + gap || (wu0 >= F.u0 - 0.01 && wu1 <= F.u1 + 0.01)) continue;
       F.u0 = Math.min(F.u0, wu0); F.u1 = Math.max(F.u1, wu1);
       F.off = Math.max(F.off, off); F.eave = Math.min(F.eave, w.eave);
       F.parts.push({ u0: wu0, u1: wu1, off });
@@ -820,7 +822,7 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
         // Ein eigenes Foto der Wand (photo) bedeckt immer die ganze Wand.
         const photo = shopPhotoOf(spec), full = !!spec.full || !!photo;
         if (!photo && !spec.draw) return;                  // Wohnhaus nur mit Foto: ohne Foto keine Front
-        let top = Math.min(SHOP_TOP, F.eave - 0.05 - lv.base);
+        let top = Math.min(SHOP_TOP, F.eave - 0.05 - lv.base + (spec.above || 0));   // above: Schild ragt über die Traufe
         if (full) for (const q of F.polys) for (let j = 1; j < q.length; j += 2) top = Math.max(top, q[j] - lv.base);
         shopFronts.push({ shop: { name, draw: spec.draw, tint: spec.tint || shop.tint }, photo, front: F, base: lv.base,
           plinth: lv.base - lv.bottom, width: F.u1 - F.u0, top, full, eave: F.eave - lv.base });

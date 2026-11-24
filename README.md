@@ -42,7 +42,8 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
 - **18 Läden an der Hauptstraße** (Nr. 19 bis 34) haben ihren echten Haustyp und eine gezeichnete Ladenfront mit
   Schriftzug. Haustypen sind Fachwerk, Schiefer, Putz, Klinker und Naturstein. Erste Fassaden zeigen schon
   eigene Fotos (Nr. 25, 27, Erdgeschoss von 29, Schild von 28). Dazu gezeichnete Fronten für Nr. 12 bis 17,
-  Nr. 36 bis 50 (Billard-Vereinsheim bis Rathaus-Grill) und die VR-Bank am Platz gegenüber der Kirche.
+  Nr. 36 bis 50 (Billard-Vereinsheim bis Rathaus-Grill), Nr. 37 bis 53 auf der Gegenseite (Gothaer und Glücklich
+  bis TintenPro und BIANGA) und die VR-Bank am Platz gegenüber der Kirche.
 - **St. Martinus mit Turm:** Im LoD2 fehlt der Kirchturm. Er ist nachgebaut (Maße aus dem 3D-Mesh von Geobasis NRW),
   mit Portal, Turmuhr und Schieferhelm; dazu der Kugelbrunnen vor der Bank.
 - **Spielfläche** 930 × 540 m. Start ist an der Hauptstraße beim Rathaus.

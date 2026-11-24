@@ -12,6 +12,8 @@
  *   face  optional: Himmelsrichtung der Front ('N', 'O', 'S', 'W'), wenn der Laden nicht zur Straße zeigt
  *   near  optional: [x, z] in Spielkoordinaten nahe der Front, wenn das Haus mehrere Wände zur Straße hat
  *   jog   optional: größter Vor- oder Rücksprung (m), bis zu dem Wandstücke zur selben Front gehören (Standard 0,6)
+ *   gap   optional: größte Lücke (m) zwischen Wandstücken derselben Front, z. B. schräge Erkerwände (Standard 0,5)
+ *   above optional: so weit (m) darf die Front über die Traufe hinausragen, z. B. ein Schildkasten auf einem Vordach
  *   more  optional: weitere Fronten desselben Hauses, je { name, draw, face?, near?, jog? }
  *   full  optional: das Bild bedeckt die ganze Wand bis in den Giebel (P.full, P.eave, P.roofAt(x) beim Zeichnen)
  *   photo optional: eigenes, entzerrtes Foto der ganzen Wand (assets/nrw/much/fronts/<photo>.webp, gebaut mit
@@ -220,6 +222,383 @@ export const MUCH_SHOPS = {
       P.board(0.535 * W, 0.735 * W, b0 - 0.1, top, { bg: '#ffffff', border: '#cfd2d4' });
       P.text('Much', 0.635 * W, b0 + 0.5, 0.36, { color: '#2f9a8c', weight: '700', font: ROUND, maxW: 0.17 * W });
       P.text('BERGISCH. SCHÖN.', 0.635 * W, b0 + 0.12, 0.065, { color: '#7a7f84', weight: '600', spacing: 0.01, maxW: 0.17 * W });
+    },
+  },
+
+  // ---------- Nordseite westlich der Tourist-Info: Nr. 35–53 (Vorlage: Street-View-Bilder des Users, 24.11.) ----------
+  // Die Fronten zeigen nach Süden: links im Bild = Westen = x 0. Von Osten: Villa 35 oben am Hang (nur Wandfarbe) mit
+  // Garage in der Bruchsteinmauer, 37 Gothaer/Glücklich, 39 Friseur mit Balkon, 41 levanta, Durchgang zu Elektronik Haas
+  // (Hausnummer 41 am Pfeiler), 43 MEDO, Café, Post & Kiosk, Ausstellung; Schotterparkplatz; 49 Fachwerk mit Fahrschule,
+  // 51 Bioresonanzzentrum, 53 Systems Software Services, TintenPro, BIANGA.
+  'Hauptstraße 35': { name: 'Hauptstraße 35', wall: 'house2', tint: '#f6f6f4' },
+  'id:DENW46AL1000UqcI': {
+    name: 'Garage an der Hangmauer', wall: 'plain', tint: '#a48b6c',
+    draw(P) {
+      const { W, top } = P, d0 = 0.22 * W, d1 = 0.8 * W, dH = Math.min(2.15, top - 0.35);
+      P.stone(0, W, -P.plinth, top, [150, 126, 98]);
+      P.rect(d0 - 0.1, d1 + 0.1, -P.plinth, dH + 0.1, '#7d6c56');
+      P.rect(d0, d1, -P.plinth, dH, '#f2f2f0');                                // weißes Sektionaltor
+      for (let h = dH - 0.5; h > 0; h -= 0.5) P.rect(d0, d1, h - 0.015, h + 0.015, '#cfd0ce');
+      P.rect(d0 - 0.55, d0 - 0.2, 1.5, 1.75, '#f1f1ef');                        // Schild „Ausfahrt freihalten“
+      P.rect(d1 + 0.2, d1 + 0.42, 1.3, 1.6, '#e9e9e6');
+    },
+  },
+  'Hauptstraße 37': {
+    // Gothaer Versicherungsbüro und Glücklich (Hausnummer an der Ladentür) unter einem dunklen, schiefergrünen Blendband
+    name: 'Gothaer · Glücklich', wall: 'house2', tint: '#f7f7f5',
+    draw(P) {
+      const { W, top } = P, m = W / 14.3, oH = Math.min(2.45, top - 0.9), b0 = oH + 0.08, fr = '#2f3133', blue = '#1d5aa6';
+      P.plaster('#f4f4f2');
+      P.rect(0, W, -P.plinth, b0, fr);                                          // dunkle Ladenrahmung
+      P.rect(0, W, -P.plinth, 0.04, '#8d8b86');
+      // Gothaer: Schaufenster, offene Tür, Schaufenster – blaue Tafeln und Plakate
+      for (const [a, b] of [[0.7, 3.0], [4.3, 5.4]]) {
+        P.glass(a * m, b * m, 0.08, oH - 0.05, { light: true, interior: 'empty' });
+        P.rect(a * m + 0.2, a * m + 0.7, 0.1, 1.85, blue);
+        P.rect(a * m + 0.2, a * m + 0.7, 2.0, 2.25, blue);
+        P.text('Gothaer', a * m + 0.45, 2.125, 0.08, { color: '#ffffff', font: SERIF, weight: '700', maxW: 0.42 });
+      }
+      P.rect(1.55 * m, 2.25 * m, 0.95, 1.95, '#a8569a');                        // Plakate (nur Farbflächen)
+      P.rect(4.75 * m, 5.25 * m, 1.0, 1.9, '#d9572f');
+      P.door(3.1 * m, 4.2 * m, 0.02, oH - 0.05, { frame: fr, open: true });
+      // Glücklich: Kleider an Puppen, Taschen und Geschenke, Hausnummer über der Tür
+      P.glass(5.8 * m, 8.95 * m, 0.08, oH - 0.05, { light: true, interior: 'empty' });
+      for (const [x, c] of [[6.35, '#c9b48f'], [6.95, '#e2708a'], [8.05, '#d9382e'], [8.55, '#e0463a']]) dress(P, x * m, 0.25, c);
+      P.shrub(7.45 * m, 0.1, 0.6, 0.6);
+      for (const [a, b] of [[9.35, 10.1], [11.0, 12.7], [12.85, 14.15]]) P.glass(a * m, b * m, 0.08, oH - 0.05, { light: true, interior: 'shop' });
+      P.door(10.2 * m, 10.95 * m, 0.02, oH - 0.05, { frame: fr, glass: true });
+      P.text('37', 10.57 * m, oH - 0.22, 0.13, { color: '#f2f2f2', weight: '700' });
+      P.rect(12.1 * m, 13.6 * m, 0.55, 0.6, '#b08a5a');                          // Holzregal mit Waren vor dem Laden
+      for (let x = 12.15 * m; x < 13.55 * m; x += 0.28) P.rect(x, x + 0.2, 0.6, 0.75 + P.rnd() * 0.12, `hsl(${P.rnd() * 360 | 0},40%,65%)`);
+      for (const x of [0.25, 5.6, 9.2, 12.78]) P.board(x * m - 0.12, x * m + 0.12, oH - 0.6, oH - 0.36, { ellipse: true, bg: '#f4f4f0' });
+      // Blendband mit zwei Schildern
+      P.rect(0, W, b0, top, '#465049');
+      P.rect(5.35 * m, 10.2 * m, b0 - 0.07, b0, '#465049');                      // Mittelteil etwas tiefer
+      P.rect(0, W, top - 0.05, top, '#363d39');
+      const s0 = b0 + 0.08, s1 = top - 0.07, sm = (s0 + s1) / 2;
+      P.board(0.93 * m, 5.05 * m, s0, s1, { bg: '#ffffff', border: '#d6d6d6', borderW: 0.012 });
+      P.text('Gothaer', 2.15 * m, sm, 0.34, { color: blue, font: SERIF, weight: '700', maxW: 2.2 * m });
+      P.rect(3.38 * m, 3.4 * m, s0 + 0.08, s1 - 0.08, '#9a9a9a');
+      P.text('Versicherungsbüro', 4.2 * m, sm + 0.08, 0.1, { color: '#333333', maxW: 1.5 * m });
+      P.text('Much', 4.2 * m, sm - 0.09, 0.1, { color: '#333333', maxW: 1.5 * m });
+      P.board(10.9 * m, 13.8 * m, s0, s1, { bg: '#f3f1ea', border: '#d8d4c8', borderW: 0.012 });
+      P.text('GLÜCKLICH', 12.35 * m, sm + 0.02, 0.19, { color: '#6d6a64', weight: '400', spacing: 0.06, maxW: 2.5 * m });
+    },
+  },
+  'Hauptstraße 39': {
+    // Friseur ohne Namensschild: Schaufenster mit Frisurenplakaten, darüber ein Balkon über die ganze Breite mit
+    // verschnörkeltem Eisengeländer und Geranien. full: auch das Obergeschoss mit den braunen Rollläden nach Foto.
+    name: 'Friseur Hauptstraße 39', wall: 'house2', tint: '#f3f2ee', full: true,
+    draw(P) {
+      const { W, top } = P, m = W / 12.6, gf = P.full ? Math.min(SHOP_TOP, top) : top;
+      const oH = Math.min(2.5, gf - 0.85), s0 = oH + 0.2, s1 = s0 + 0.32, fr = '#f6f6f4';   // s0..s1 = Balkonplatte
+      P.plaster('#f3f2ee');
+      P.plinthBand('#d6d5d0', 0.3);
+      P.window(0.9 * m, 3.45 * m, 0.55, oH, { frame: fr, t: 0.07, interior: 'empty' });
+      P.rect(1.55 * m, 2.85 * m, 0.7, oH - 0.12, '#5b6f86');                    // Frisurenplakate (nur Farbflächen)
+      P.steps(3.5 * m, 5.3 * m, -P.plinth, 0.3, 2, '#bdbbb5');
+      P.door(3.6 * m, 4.7 * m, 0.3, oH, { frame: fr, glass: true });
+      P.glass(4.78 * m, 5.22 * m, 0.35, oH - 0.07, { light: true });
+      P.rect(3.85 * m, 4.35 * m, 1.25, 1.65, '#f0c64a');                         // Aushang Öffnungszeiten
+      P.window(5.3 * m, 10.65 * m, 0.55, oH, { frame: fr, t: 0.07, interior: 'empty' });
+      P.rect(8.4 * m, 9.9 * m, 0.7, oH - 0.1, '#c9a36a');
+      P.shrub(6.0 * m, 0.55, 0.7, 0.9);
+      P.rect(5.38 * m, 5.42 * m, 0.3, 1.25, '#9aa0a6');                          // Handlauf an der Treppe
+      P.rect(5.38 * m, 6.4 * m, 1.21, 1.25, '#9aa0a6');
+      P.rect(0, W, s0 - 0.22, s0, 'rgba(0,0,0,0.1)');                            // Balkonplatte mit Schatten
+      P.rect(0, W, s0, s1, '#efefed');
+      P.rect(0, W, s0, s0 + 0.03, '#c6c6c2');
+      if (!P.full) return;
+      const eave = Math.min(P.eave, top), r0 = s1, r1 = s1 + 0.95;
+      const w1 = Math.min(eave - 0.3, r0 + 2.1), w0 = Math.max(r0 + 0.35, w1 - 1.5);
+      P.plaster('#f1f0ec', s1, top);
+      for (const [a, b] of [[1.73, 5.8], [7.6, 9.75]]) {                         // braune Holzrollläden, geschlossen
+        P.rect(a * m - 0.07, b * m + 0.07, w0 - 0.07, w1 + 0.07, '#e4e3df');
+        P.rect(a * m, b * m, w0, w1, '#7a4a2a');
+        for (let h = w0 + 0.05; h < w1; h += 0.06) P.rect(a * m, b * m, h, h + 0.012, 'rgba(0,0,0,0.2)');
+      }
+      // Eisengeländer mit Schlaufen, davor Blumenkästen mit roten Geranien
+      const iron = '#26272a';
+      P.rect(0, W, r1 - 0.05, r1, iron);
+      P.rect(0, W, r0 + 0.08, r0 + 0.11, iron);
+      for (let x = 0.06; x < W; x += 0.14) P.rect(x, x + 0.018, r0, r1, iron);
+      for (let x = 0.06; x < W - 0.2; x += 0.28) P.board(x + 0.02, x + 0.26, r0 + 0.35, r1 - 0.12, { ellipse: true, bg: 'rgba(0,0,0,0)', border: iron, borderW: 0.018 });
+      for (const [a, b] of [[0.83, 1.94], [2.9, 3.94], [5.2, 6.3], [7.68, 8.86], [10.03, 11.9]]) {
+        P.rect(a * m, b * m, r0, r0 + 0.18, '#5d4b3c');
+        for (let x = a * m + 0.06; x < b * m - 0.04; x += 0.11) {
+          P.board(x - 0.07, x + 0.07, r0 + 0.14, r0 + 0.3, { ellipse: true, bg: '#3f7a3a' });
+          if (P.rnd() < 0.6) P.board(x - 0.05, x + 0.05, r0 + 0.25, r0 + 0.37, { ellipse: true, bg: '#d8242c' });
+        }
+      }
+    },
+  },
+  'Hauptstraße 41': {
+    // levanta „duftendes & schönes“: zwei Schaufenster, Eingang mit Stufen dazwischen, breites helles Schild in Lila.
+    // Die Hausnummer 41 hängt nebenan am Pfeiler des Durchgangs zu Elektronik Haas.
+    name: 'levanta', wall: 'house2', tint: '#f4f4f1',
+    draw(P) {
+      const { W, top } = P, m = W / 11.1, oH = Math.min(2.5, top - 0.85), s0 = oH + 0.15, lila = '#6c5aa6', fr = '#f7f7f5';
+      P.plaster('#f3f3f0');
+      P.rect(0, W, -P.plinth, 0.48, '#c3b3a1');                                 // taupefarbener Sockel
+      P.window(0.74 * m, 4.5 * m, 0.48, oH, { frame: fr, t: 0.08, interior: 'shop' });
+      P.steps(4.45 * m, 6.4 * m, -P.plinth, 0.3, 2, '#55585c');
+      P.rect(4.5 * m, 6.35 * m, 0.3, oH, fr);
+      P.glass(4.58 * m, 5.3 * m, 0.35, oH - 0.08, { light: true, interior: 'shop' });
+      P.door(5.36 * m, 6.3 * m, 0.3, oH - 0.03, { frame: fr, glass: true });
+      P.window(6.4 * m, 10.55 * m, 0.48, oH, { frame: fr, t: 0.08, interior: 'shop' });
+      P.text('levanta', 8.1 * m, oH - 0.3, 0.17, { color: '#ffffff', font: SERIF, style: 'italic', maxW: 1.2 * m });
+      P.board(0.1 * m, 0.62 * m, 0.7, 1.9, { bg: '#f4f4f2', border: '#c9c9c6', borderW: 0.01 });   // Infotafel am Rand
+      P.board(0, W, s0, top - 0.02, { bg: '#f4f2f8', border: '#e1deea', borderW: 0.012 });
+      P.text('duftendes & schönes', 5.1 * m, top - 0.19, 0.1, { color: lila, maxW: 3.0 * m });
+      P.text('levanta', 5.1 * m, s0 + (top - s0) * 0.36, 0.34, { color: lila, weight: '400', maxW: 3.0 * m });
+    },
+  },
+  // Durchgang zu Elektronik Haas zwischen 41 und 43: ein 5 m tiefes Vordach über dem Durchgang, hinten die Türen. Im LoD2
+  // ist das Vordach ein geschlossener Block (Uv5m, 2,7 m hoch); die Front kommt auf seine Straßenseite und zeigt den
+  // Durchgang. Der Schildkasten steht oben auf der Vorderkante und ragt über den Block hinaus (above).
+  'id:DENW46AL1000Uv5m': {
+    name: 'Elektronik Haas', wall: 'plain', tint: '#9c7a5c', above: 1.0,
+    draw(P) {
+      const { W, top } = P, cH = Math.max(2.0, Math.min(2.6, P.eave - 0.08)), brick = '#9c7a5c';
+      const pillar = (a, b) => {
+        P.rect(a, b, -P.plinth, cH, brick);
+        for (let h = 0.08; h < cH; h += 0.08) P.rect(a, b, h, h + 0.012, 'rgba(255,255,255,0.18)');
+      };
+      P.rect(0, W, -P.plinth, cH, '#25262a');                                   // dunkler Durchgang, hinten Glastüren
+      P.rect(1.4, W - 0.7, -P.plinth, cH - 0.4, '#3a3b3e');
+      P.rect(1.4, W - 0.7, -P.plinth, 0.02, '#55565a');
+      P.door(2.2, 3.4, 0, cH - 0.7, { frame: '#4a4b4e', glass: true, double: true });
+      P.rect(3.6, 4.3, 0, cH - 0.7, '#4a4b4e');
+      pillar(0, 1.0); pillar(W - 0.4, W);
+      P.rect(0.1, 0.28, 1.9, 2.12, '#e8b53c');                                   // Hausnummer am Pfeiler
+      P.text('41', 0.19, 2.01, 0.12, { color: '#2b2b2b', weight: '700' });
+      P.board(0.4, 0.92, 0.95, 1.85, { bg: '#f4f4f2' });                         // Infotafel
+      P.text('ELEKTRONIK', 0.66, 1.7, 0.05, { color: '#1f56b8', weight: '800', maxW: 0.44 });
+      P.text('Haas', 0.66, 1.57, 0.08, { color: '#1b2f6e', weight: '800', style: 'italic', maxW: 0.44 });
+      for (let k = 0; k < 6; k++) P.rect(0.47, 0.85, 1.05 + k * 0.07, 1.08 + k * 0.07, 'rgba(60,60,60,0.35)');
+      // Schildkasten über die ganze Breite
+      const s0 = cH + 0.02, s1 = top - 0.03, sm = (s0 + s1) / 2, sx = Math.min(1, W / 5.5);
+      P.board(0, W, s0, s1, { bg: '#f2f3f5', border: '#c8cbd0', borderW: 0.015 });
+      P.board(0.1 * sx, 1.55 * sx, sm - 0.04, s1 - 0.07, { bg: '#1f56b8', border: '#f2c21b', borderW: 0.02 });
+      P.text('ELEKTRONIK', 0.82 * sx, (sm + s1) / 2 - 0.02, 0.15, { color: '#ffffff', weight: '800', style: 'italic', maxW: 1.3 * sx });
+      P.text('Verkauf • Service', 0.82 * sx, s0 + 0.15, 0.1, { color: '#1d1d1d', weight: '700', maxW: 1.4 * sx });
+      P.text('Meisterbetrieb', 2.45 * sx, s1 - 0.1, 0.07, { color: '#1d1d1d', weight: '700', maxW: 1.1 * sx });
+      P.text('Haas', 2.45 * sx, sm - 0.07, 0.32, { color: '#1b2f6e', weight: '900', style: 'italic', maxW: 1.4 * sx });
+      const list = ['Unterhaltungselektronik', 'Telekommunikation / Vernetzung', 'Haushaltsgroß- und Kleingeräte', 'Empfangstechnik', 'Multimedia'];
+      list.forEach((t, i) => P.text(t, 3.35 * sx, s1 - 0.09 - i * (s1 - s0 - 0.12) / 5, 0.05, { color: '#1d1d1d', weight: '700', align: 'left', maxW: W - 3.45 * sx }));
+    },
+  },
+  'id:DENW46AL1000UrP2': { name: 'Durchgang Haas (hinten)', wall: 'plain', tint: '#efefed' },
+  'Hauptstraße 43': {
+    // Langes Geschäftshaus mit Erkern, Erdgeschoss zwischen Granitpfeilern. Von Westen: Durchgang mit Mülltonnen,
+    // Ausstellung für Fenster und Türen, Post & Kiosk („Kangoo-Shop“, gelber Briefkasten, Postkartenständer), Café/Imbiss,
+    // MEDO im flachen Vorbau unter der Dachterrasse. Im LoD2 springt die Front an jedem Erker vor und zurück (jog, gap).
+    name: 'MEDO · Post & Kiosk', wall: 'house2', tint: '#d6d4cf', jog: 1.2, gap: 0.8,
+    draw(P) {
+      const { W, top } = P, m = W / 28.6, oH = Math.min(2.4, top - 0.95), b0 = oH + 0.42, teal = '#3cc7b4', fr = '#f4f4f2';
+      P.plaster('#d3d1cc');                                                      // grauer Rauputz
+      P.rect(0, W, -P.plinth, 0.1, '#8e8a84');
+      P.rect(0, 1.5 * m, -P.plinth, b0, '#34363a');                              // Durchgang mit Mülltonnen
+      P.rect(0.15 * m, 0.7 * m, 0, 1.1, '#3f6b3f');
+      P.rect(0.78 * m, 1.32 * m, 0, 1.1, '#e0b52c');
+      // Ausstellung: sechs Felder mit Oberlicht, darin Tür- und Fenstermuster
+      for (let i = 0; i < 6; i++) P.window((1.75 + i * 0.95) * m, (2.7 + i * 0.95) * m, 0.12, oH, { frame: fr, t: 0.06, transom: 0.42, interior: 'empty' });
+      P.rect(1.95 * m, 2.55 * m, 0.14, 1.95, '#f1f1ef');
+      P.glass(2.07 * m, 2.43 * m, 1.05, 1.82, { light: true });
+      P.rect(4.0 * m, 4.9 * m, 0.55, 1.65, '#e6e6e3');
+      P.glass(4.08 * m, 4.82 * m, 0.63, 1.57, { light: true });
+      P.rect(6.0 * m, 6.35 * m, 1.2, 1.5, '#ffffff');                            // Zettel an der Scheibe
+      // Post & Kiosk: zwei Abschnitte, Schriftzug in den Oberlichtern
+      for (let i = 0; i < 5; i++) {
+        const a = (8.15 + i * 0.9) * m, b = a + 0.9 * m;
+        P.window(a, b, 0.12, oH, { frame: fr, t: 0.05, transom: 0.42, interior: i % 2 ? 'display' : 'shop' });
+        P.text('Kangoo-Shop', (a + b) / 2, oH - 0.21, 0.07, { color: teal, weight: '700', maxW: 0.8 * m });
+      }
+      P.window(13.25 * m, 14.4 * m, 0.12, oH, { frame: fr, t: 0.05, transom: 0.42, interior: 'shop' });
+      P.door(14.4 * m, 15.6 * m, 0.02, oH, { frame: fr, glass: true, transom: 0.42 });
+      P.window(15.6 * m, 16.85 * m, 0.12, oH, { frame: fr, t: 0.05, transom: 0.42, interior: 'shop' });
+      P.window(16.85 * m, 18.15 * m, 0.12, oH, { frame: fr, t: 0.05, transom: 0.42, interior: 'shop' });
+      P.text('Kangoo - Shop', 15.6 * m, oH - 0.21, 0.22, { color: teal, weight: '800', maxW: 3.6 * m });
+      for (const [a, b] of [[13.45, 14.15], [16.25, 16.9], [17.1, 17.75]]) cards(P, a * m, b * m, 0.05, 1.85);
+      P.rect(11.95 * m, 12.55 * m, 0, 1.15, '#f2c200');                           // gelber Briefkasten
+      P.rect(11.95 * m, 12.55 * m, 1.15, 1.27, '#d4a900');
+      P.rect(12.1 * m, 12.4 * m, 0.75, 0.95, '#f7f3e6');
+      // Café/Imbiss: Speisekarte, Tür, Fenster, Tische davor
+      P.rect(19.05 * m, 19.5 * m, 0.12, 2.2, '#7a2f28');
+      for (let k = 0; k < 7; k++) P.rect(19.12 * m, 19.43 * m, 0.45 + k * 0.23, 0.5 + k * 0.23, 'rgba(255,238,215,0.75)');
+      P.door(19.6 * m, 20.45 * m, 0.08, oH, { frame: '#9fa3a6', glass: true, transom: 0.42 });
+      P.window(20.5 * m, 21.5 * m, 0.12, oH, { frame: '#9fa3a6', t: 0.05, transom: 0.42, interior: 'cafe' });
+      P.window(21.5 * m, 23.35 * m, 0.12, oH, { frame: '#9fa3a6', t: 0.05, transom: 0.42, mullions: 1, interior: 'cafe' });
+      for (const x of [19.2, 20.8, 22.2]) {
+        P.rect(x * m, x * m + 0.7, 0.72, 0.77, '#7b5634');
+        P.rect(x * m + 0.33, x * m + 0.37, 0, 0.72, '#3a3a3a');
+      }
+      // Granitpfeiler und Granitband über dem Erdgeschoss
+      granite(P, 1.5 * m, 23.9 * m, oH, b0);
+      for (const [a, b] of [[1.5, 1.75], [7.45, 8.15], [12.65, 13.25], [18.15, 18.95], [23.4, 23.9]]) granite(P, a * m, b * m, -P.plinth, b0);
+      for (const x of [7.75, 12.95, 18.5]) P.rect(x * m - 0.05, x * m + 0.05, -P.plinth, top, '#5e4a3a');   // Fallrohre
+      P.board(12.72 * m, 13.18 * m, b0 + 0.04, Math.min(top - 0.03, b0 + 0.5), { bg: '#f2c200' });      // Post-Schild
+      // MEDO im flachen Vorbau: Sichtbetonbrüstung, Fenster, große Blende, senkrechtes Schild am Pfeiler
+      const M0 = 23.9 * m, M1 = W - 0.05, mf = Math.min(top - 0.08, oH + 0.95);
+      P.rect(M0, M1, -P.plinth, 0.55, '#b9b6b0');
+      for (let x = M0 + 0.15; x < M1; x += 0.15) P.rect(x, x + 0.01, -P.plinth, 0.55, 'rgba(0,0,0,0.12)');
+      P.door(M0 + 0.12, M0 + 1.0, 0.02, oH - 0.05, { frame: '#e8e8e6', glass: true });
+      P.window(M0 + 1.08, M1 - 0.1, 0.55, oH - 0.05, { frame: '#e8e8e6', t: 0.05, mullions: 2, interior: 'cafe' });
+      P.rect(M0, M1, oH - 0.05, mf, '#f7f7f5');
+      P.rect(M0, M1, oH - 0.05, oH - 0.01, '#bdbdbd');
+      P.text('MEDO', M0 + (M1 - M0) * 0.45, (oH + mf) / 2, 0.75, { color: '#151515', weight: '900', font: SERIF, spacing: 0.04, maxW: (M1 - M0) * 0.75 });
+      P.rect(M1 - 0.75, M1 - 0.25, oH + 0.2, mf - 0.18, '#c4c6c8');
+      for (let h = oH + 0.24; h < mf - 0.2; h += 0.07) P.rect(M1 - 0.75, M1 - 0.25, h, h + 0.02, '#9c9fa2');
+      P.board(23.47 * m, 23.83 * m, 0.95, oH - 0.05, { bg: '#f7f7f5' });
+      ['M', 'E', 'D', 'O'].forEach((c, i) => P.text(c, 23.65 * m, oH - 0.3 - i * 0.36, 0.28, { color: '#151515', weight: '900', font: SERIF }));
+    },
+  },
+  'Hauptstraße 49': {
+    // Fachwerkhaus (Hausnummer am Briefkasten) mit vorkragendem Obergeschoss und Balkenköpfen, im Ostteil die Fahrschule
+    // Neukirchen; östlich daneben der Schotterparkplatz. full: auch das Obergeschoss nach Foto.
+    name: 'Fahrschule Neukirchen', wall: 'fachwerk', tint: '#ffffff', full: true,
+    draw(P) {
+      const { W, top } = P, m = W / 13.3, beam = '#1f2226', bw = 0.15, eave = Math.min(P.eave, top), blue = '#2a6fd6';
+      const V = (x, h0, h1, w = bw) => P.rect(Math.max(0, x * m - w / 2), Math.min(W, x * m + w / 2), h0, h1, beam);
+      const H = (a, b, h) => P.rect(a * m, b * m, h, h + bw, beam);
+      P.plaster('#f6f6f4');
+      P.stone(0, W, -P.plinth, 0.3, [138, 128, 116]);                           // Bruchsteinsockel
+      // Erdgeschoss: Schwelle, Ständer, Riegel, Strebe links, Rähm; darüber Balkenköpfe und die Schwelle des Obergeschosses
+      H(0, 13.3, 0.3);
+      for (const x of [0.08, 1.08, 2.32, 3.12, 4.28, 4.68, 5.88, 6.93]) V(x, 0.3, 2.86);
+      V(13.08, 0.3, 2.86, 0.42);
+      for (const [a, b] of [[0, 1.08], [2.32, 3.12], [4.28, 4.68], [5.88, 6.93]]) H(a, b, 0.95);
+      H(0, 6.93, 2.35);
+      brace(P, 0.15 * m, 1.1, 1.0 * m, 2.35, bw, beam);
+      H(0, 13.3, 2.71);
+      P.rect(0, W, 2.86, 3.02, 'rgba(0,0,0,0.35)');
+      for (let x = 0.1; x < W - 0.1; x += 0.62) P.rect(x, x + 0.14, 2.86, 3.02, beam);
+      P.rect(0, W, 3.02, 3.18, beam);
+      // Haustür mit Glasstreifen, Briefkasten „49“, Fenster mit hellblauen Rollos
+      P.steps(1.1 * m, 2.3 * m, -P.plinth, 0.3, 1, '#a59e92');
+      P.rect(1.17 * m, 2.23 * m, 0.3, 2.37, '#f4f4f2');
+      P.door(1.24 * m, 2.16 * m, 0.3, 2.3, { frame: '#f4f4f2', panel: '#efefed' });
+      P.glass(1.55 * m, 1.68 * m, 0.55, 2.1, { light: true });
+      P.rect(0.72 * m, 0.98 * m, 1.2, 1.5, '#4a4d52');
+      P.text('49', 0.85 * m, 1.3, 0.07, { color: '#e6e6e6', weight: '700' });
+      for (const [a, b] of [[3.2, 4.2], [4.76, 5.8]]) {
+        P.window(a * m, b * m, 1.1, 2.3, { frame: '#f6f6f4', outer: '#ecebe7', t: 0.07 });
+        P.rect(a * m + 0.07, b * m - 0.07, 1.17, 2.1, 'rgba(150,200,215,0.8)');
+      }
+      // Fahrschule: zwei große Schaufenster mit Milchglasfolie und Schriftzug, Tür dazwischen
+      for (const [a, b] of [[7.1, 9.1], [10.15, 12.85]]) {
+        P.rect(a * m - 0.12, b * m + 0.12, 0.3, 2.52, '#f3f3f1');
+        P.rect(a * m - 0.12, b * m + 0.12, 0.3, 0.42, '#b8ad9c');
+        P.glass(a * m, b * m, 0.42, 2.4, { interior: 'empty' });
+        P.rect(a * m, b * m, 0.42, 1.3, 'rgba(226,231,233,0.82)');
+      }
+      P.door(9.15 * m, 10.1 * m, 0.12, 2.42, { frame: '#f3f3f1', glass: true, t: 0.1 });
+      for (let k = 1; k < 3; k++) P.rect(9.15 * m + 0.1, 10.1 * m - 0.1, 1.95 + k * 0.13, 1.96 + k * 0.13, '#f3f3f1');
+      P.text('POWER DAYS', 8.1 * m, 2.2, 0.15, { color: '#d8262c', weight: '800', maxW: 1.8 * m });
+      P.text('7 Tage 1:1 Theorie', 8.1 * m, 2.0, 0.09, { color: '#d8262c', weight: '700', maxW: 1.8 * m });
+      P.text('OPEN', 11.5 * m, 2.15, 0.11, { color: '#ff4a4a', weight: '700', stroke: '#2a5cc0' });
+      for (const xc of [8.1, 11.5]) {
+        P.text('Fahrschule', xc * m, 1.62, 0.2, { color: blue, style: 'italic', weight: '800', stroke: '#ffffff', maxW: 1.7 * m });
+        P.text('NEUKIRCHEN', xc * m, 1.4, 0.12, { color: blue, weight: '800', stroke: '#ffffff', maxW: 1.6 * m });
+        P.text('www.fahrschule-neukirchen.de', xc * m, 0.56, 0.055, { color: '#2b2b2b', weight: '700', maxW: 1.8 * m });
+      }
+      P.text('FAHRSCHULE', 11.5 * m, 1.05, 0.09, { color: '#2b2b2b', weight: '800' });
+      P.rect(W - 0.08, W, -P.plinth, top, '#a7abae');                             // Fallrohr an der Ostecke
+      if (!P.full) return;
+      // Obergeschoss: Ständer, Brüstungs- und Sturzriegel, Rähm, Streben an beiden Enden, sechs Fenster
+      const w1 = Math.min(eave - 0.35, 5.4), w0 = Math.min(4.1, w1 - 0.9);
+      P.plaster('#f6f6f4', 3.18, top);
+      for (const x of [0.08, 1.27, 2.22, 3.12, 4.12, 4.68, 5.78, 6.62, 7.32, 8.17, 9.12, 9.97, 10.67, 11.67]) V(x, 3.18, eave);
+      V(13.21, 3.18, eave);
+      H(0, 13.3, w0 - bw);
+      H(0, 13.3, w1);
+      H(0, 13.3, eave - bw);
+      brace(P, 0.15 * m, 3.18, 1.2 * m, eave - bw, bw, beam);
+      brace(P, 11.75 * m, eave - bw, 13.13 * m, 3.18, bw, beam);
+      for (const [a, b] of [[1.35, 2.15], [3.2, 4.05], [4.76, 5.7], [7.4, 8.1], [9.2, 9.9], [10.75, 11.6]]) {
+        P.window(a * m, b * m, w0, w1, { frame: '#f6f6f4', outer: '#ecebe7', t: 0.07, mullions: 1 });
+      }
+      if (top > eave + 0.1) P.slate(0, W, eave, top);
+    },
+  },
+  'Hauptstraße 51': {
+    // Weißer Bau mit zwei Eingängen über Stufen: Büro mit grünen Lamellen, Bioresonanzzentrum für Tiere
+    name: 'Bioresonanzzentrum für Tiere', wall: 'house2', tint: '#f7f7f5',
+    draw(P) {
+      const { W, top } = P, m = W / 18.6, oH = Math.min(2.35, top - 1.0), fr = '#f8f8f6', green = '#3aa35a';
+      P.plaster('#f5f5f3');
+      P.plinthBand('#8f9499', 0.32);
+      P.door(0.4 * m, 1.3 * m, 0.25, oH, { frame: fr, panel: '#f2f2f0' });      // weiße Nebentür
+      P.window(1.9 * m, 3.95 * m, 0.55, oH, { frame: fr, t: 0.07 });
+      P.rect(1.9 * m + 0.07, 3.95 * m - 0.07, 0.62, oH - 0.07, '#cdd6bd');      // grüne Lamellen
+      for (let x = 1.9 * m + 0.1; x < 3.95 * m - 0.07; x += 0.09) P.rect(x, x + 0.012, 0.62, oH - 0.07, 'rgba(0,0,0,0.08)');
+      for (const [a, b] of [[5.15, 7.65], [8.75, 11.5]]) P.steps(a * m, b * m, -P.plinth, 0.35, 2, '#b4b3ae');
+      P.window(5.3 * m, 6.4 * m, 0.35, oH, { frame: fr, t: 0.07, interior: 'empty' });
+      P.door(6.4 * m, 7.5 * m, 0.35, oH, { frame: fr, glass: true });
+      P.door(8.9 * m, 10.1 * m, 0.35, oH, { frame: fr, glass: true });
+      P.window(10.1 * m, 11.35 * m, 0.35, oH, { frame: fr, t: 0.07, frosted: 0.75 });
+      P.text('Bioresonanz-', 10.72 * m, 1.75, 0.06, { color: '#2f3a44', weight: '700', maxW: 1.0 * m });
+      P.text('zentrum für Tiere', 10.72 * m, 1.62, 0.06, { color: '#2f3a44', weight: '700', maxW: 1.0 * m });
+      P.rect(8.3 * m, 8.55 * m, 1.6, 1.9, '#f3f3f1');                            // Briefkasten
+      P.rect(11.8 * m - 0.05, 11.8 * m + 0.05, -P.plinth, top, '#a7abae');      // Fallrohr
+      P.window(13.5 * m, 17.05 * m, 0.55, oH, { frame: fr, t: 0.07, interior: 'empty' });
+      P.text('Bioresonanzzentrum für Tiere', 15.27 * m, oH - 0.2, 0.13, { color: green, weight: '700', maxW: 3.3 * m });
+      for (const [x, h] of [[14.1, 1.55], [16.35, 1.45]]) easel(P, x * m, 0.62, h, '#6fa6d6');
+      P.rect(15.0 * m, 15.6 * m, 0.62, 0.95, '#b48a55');                        // Korb
+      P.rect(13.1 * m, 13.3 * m, oH + 0.35, oH + 0.6, '#ecece9');                // Wandleuchte
+      P.rect(11.2 * m, 11.4 * m, top - 0.4, top - 0.1, '#d23a32');               // Alarmgeber
+    },
+  },
+  'Hauptstraße 53': {
+    // Weißer Bau mit grauem Sockel. Von Westen: BIANGA (goldene Buchstaben), Eingangsnische mit TintenPro und
+    // Computer-Doktor über einem Podest mit Stufen, Systems Software Services
+    name: 'TintenPro · BIANGA', wall: 'house2', tint: '#f7f7f5',
+    draw(P) {
+      const { W, top } = P, m = W / 21, oH = Math.min(2.3, top - 1.1), fr = '#f8f8f6', recH = Math.min(2.88, top - 0.5);
+      P.plaster('#f5f5f3');
+      P.plinthBand('#8f9499', 0.3);
+      // BIANGA
+      P.window(1.4 * m, 4.13 * m, 0.3, oH, { frame: fr, t: 0.1, interior: 'gallery' });
+      P.text('BIANGA', 2.77 * m, oH + 0.42, 0.36, { color: '#c49a4a', font: SERIF, weight: '600', spacing: 0.06, maxW: 2.8 * m });
+      for (const x of [1.1, 4.5]) P.rect(x * m - 0.05, x * m + 0.05, oH + 0.38, oH + 0.48, '#3a3a3a');
+      for (const x of [5.0, 16.9]) P.rect(x * m - 0.05, x * m + 0.05, -P.plinth, top, '#a7abae');   // Fallrohre
+      // Eingangsnische mit Podest, Glasfront mit Oberlichtern
+      P.steps(6.85 * m, 15.5 * m, -P.plinth, 0.22, 2, '#c4c2bc');
+      P.rect(7.0 * m, 15.0 * m, 0.22, recH, '#e4e4e1');
+      P.rect(7.0 * m, 15.0 * m, recH - 0.12, recH, 'rgba(0,0,0,0.2)');
+      const t0 = recH - 0.62;                                                      // Unterkante der Oberlichter
+      for (const [a, b] of [[7.13, 8.07], [8.07, 9.33], [12.2, 13.6], [13.6, 14.8]]) {
+        P.window(a * m, b * m, 0.22, recH - 0.12, { frame: fr, t: 0.07, transom: recH - 0.12 - t0, interior: 'empty' });
+      }
+      P.rect(7.3 * m, 7.9 * m, 0.5, 1.9, '#1d1d1f');                             // Plakat
+      P.door(9.33 * m, 10.4 * m, 0.22, t0, { frame: fr, glass: true });
+      P.glass(9.33 * m, 10.4 * m, t0 + 0.05, recH - 0.17, { light: true });
+      P.rect(10.4 * m, 10.93 * m, 0.22, recH - 0.12, '#cfcfcc');
+      P.door(10.93 * m, 12.2 * m, 0.22, t0, { frame: fr, glass: true });
+      P.glass(10.93 * m, 12.2 * m, t0 + 0.05, recH - 0.17, { light: true });
+      P.shrub(9.0 * m, 0.22, 0.45, 0.8);
+      P.board(12.45 * m, 13.35 * m, 1.62, 2.08, { bg: '#ffffff' });                // Aushänge
+      P.text('Tinte', 12.9 * m, 1.95, 0.08, { color: '#1f5fae', weight: '700' });
+      P.text('Papier', 12.9 * m, 1.74, 0.08, { color: '#1f5fae', weight: '700' });
+      P.board(13.75 * m, 14.65 * m, 1.6, 2.1, { bg: '#ffffff' });
+      P.text('Drucker-', 14.2 * m, 1.95, 0.075, { color: '#1f5fae', weight: '700' });
+      P.text('Patrone ?', 14.2 * m, 1.74, 0.075, { color: '#1f5fae', weight: '700' });
+      P.rect(7.0 * m, 7.13 * m, 0.22, recH, '#d6d6d3');                          // Laibungen
+      P.rect(14.8 * m, 15.0 * m, 0.22, recH, '#d6d6d3');
+      P.board(11.67 * m, 13.4 * m, recH + 0.07, top - 0.03, { bg: '#ffffff', border: '#cfd3d8', borderW: 0.012 });
+      P.text('TintenPro', 12.53 * m, (recH + top) / 2 + 0.02, 0.24, { color: '#1f5fae', style: 'italic', weight: '800', maxW: 1.55 * m });
+      P.board(15.4 * m, 16.15 * m, oH + 0.3, oH + 0.78, { bg: '#e6e8ea', border: '#b9bdc1', borderW: 0.01 });
+      P.text('Computer', 15.77 * m, oH + 0.63, 0.06, { color: '#2c3e5c', font: SERIF, maxW: 0.65 * m });
+      P.text('Doktor', 15.77 * m, oH + 0.47, 0.06, { color: '#2c3e5c', font: SERIF, maxW: 0.65 * m });
+      // Systems Software Services
+      P.window(17.5 * m, 19.85 * m, 0.5, oH, { frame: fr, t: 0.08, interior: 'poster' });
+      for (const [x, h] of [[17.9, 1.5], [18.4, 1.7], [18.85, 1.45], [19.3, 1.65]]) P.rect(x * m, x * m + 0.28, h, h + 0.36, '#f4f1dc');
+      const s0 = oH + 0.32, s1 = Math.min(top - 0.1, oH + 0.82);
+      P.board(17.3 * m, 20.1 * m, s0, s1, { bg: '#f7f7f9', border: '#9aa3b5', borderW: 0.012 });
+      P.board(17.38 * m, 17.75 * m, s0 + 0.06, s1 - 0.06, { bg: '#6d9fb8' });
+      P.text('Systems Software Services', 18.95 * m, s1 - 0.17, 0.12, { color: '#1f2f6b', font: SERIF, weight: '700', maxW: 2.2 * m });
+      P.text('DESKTOP TO MAINFRAME SOLUTIONS seit 1985', 18.95 * m, s0 + 0.11, 0.05, { color: '#1f2f6b', font: SERIF, maxW: 2.2 * m });
+      P.rect(20.3 * m, 20.45 * m, top - 0.4, top - 0.1, '#d23a32');               // Alarmgeber
     },
   },
 
@@ -853,6 +1232,49 @@ function railing(P, x0, x1, h0, h1) {
   P.rect(x0, x1, h1 - 0.04, h1, c);
   P.rect(x0, x1, (h0 + h1) / 2 - 0.015, (h0 + h1) / 2 + 0.015, c);
   for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; P.rect(x - 0.025, x + 0.025, h0, h1, c); }
+}
+
+/** Grauer Granit (Pfeiler, Bänder): Grundton mit feinen hellen und dunklen Körnern. */
+function granite(P, x0, x1, h0, h1) {
+  P.rect(x0, x1, h0, h1, '#a9a59f');
+  const n = Math.round((x1 - x0) * (h1 - h0) * 260);
+  for (let i = 0; i < n; i++) {
+    const x = x0 + P.rnd() * (x1 - x0), h = h0 + P.rnd() * (h1 - h0);
+    P.rect(x, Math.min(x1, x + 0.025), h, Math.min(h1, h + 0.025), P.rnd() < 0.5 ? 'rgba(60,58,55,0.35)' : 'rgba(245,243,238,0.4)');
+  }
+}
+
+/** Postkartenständer: graues Gestell, Reihen bunter Karten. */
+function cards(P, x0, x1, h0, h1) {
+  P.rect(x0, x1, h0, h1, '#b4b8bc');
+  for (let h = h0 + 0.1; h < h1 - 0.12; h += 0.2) {
+    for (let x = x0 + 0.03; x < x1 - 0.1; x += 0.13) P.rect(x, x + 0.11, h, h + 0.16, `hsl(${P.rnd() * 360 | 0},${40 + P.rnd() * 40 | 0}%,${50 + P.rnd() * 30 | 0}%)`);
+  }
+}
+
+/** Kleiderpuppe im Schaufenster: Rock, Oberteil, Kopf, Ständer. */
+function dress(P, x, h0, col) {
+  P.rect(x - 0.015, x + 0.015, h0, h0 + 0.2, '#8a8d90');
+  P.rect(x - 0.22, x + 0.22, h0 + 0.2, h0 + 0.85, col);
+  P.rect(x - 0.14, x + 0.14, h0 + 0.85, h0 + 1.32, col);
+  P.board(x - 0.07, x + 0.07, h0 + 1.33, h0 + 1.52, { ellipse: true, bg: '#e9e4da' });
+}
+
+/** Staffelei mit Bild: Holzbeine, darauf eine Farbfläche (oben bei h). */
+function easel(P, x, h0, h, col) {
+  P.rect(x - 0.02, x + 0.02, h0, h + 0.1, '#a8865a');
+  P.rect(x - 0.22, x - 0.18, h0, h - 0.4, '#a8865a');
+  P.rect(x + 0.18, x + 0.22, h0, h - 0.4, '#a8865a');
+  P.rect(x - 0.3, x + 0.3, h - 0.45, h, col);
+}
+
+/** Fachwerkstrebe von (xa, ha) nach (xb, hb), Breite bw: aus schmalen waagerechten Streifen. */
+function brace(P, xa, ha, xb, hb, bw, col) {
+  const n = Math.max(1, Math.ceil(Math.abs(hb - ha) * SHOP_PX)), lo = Math.min(ha, hb);
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n, h = ha + (hb - ha) * t, x = xa + (xb - xa) * t;
+    P.rect(x - bw * 0.6, x + bw * 0.6, Math.max(lo, h - Math.abs(hb - ha) / n * 0.6), h + Math.abs(hb - ha) / n * 0.6, col);
+  }
 }
 
 /**
