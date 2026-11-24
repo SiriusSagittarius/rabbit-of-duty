@@ -9,7 +9,7 @@ import { Music } from './music.js?v=3';
 import { Arsenal, buildGrenadeMesh } from './arsenal.js?v=7';
 import { createBroom } from './broom.js?v=2';
 import { buildAtriumLevel } from './atrium-level.js?v=3';
-import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=24';
+import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=30';
 import { pointInPoly, closestOnPoly, segHitsPoly } from './poly2d.js';
 import { NavMap } from './navmap.js?v=3';
 import { loadPak } from './zombie-pak.js?v=1';

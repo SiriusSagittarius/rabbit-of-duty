@@ -41,7 +41,10 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
 - **Straßen, Wege und Straßennamen** aus OpenStreetMap.
 - **18 Läden an der Hauptstraße** (Nr. 19 bis 34) haben ihren echten Haustyp und eine gezeichnete Ladenfront mit
   Schriftzug. Haustypen sind Fachwerk, Schiefer, Putz, Klinker und Naturstein. Erste Fassaden zeigen schon
-  eigene Fotos (Nr. 25, 27, Erdgeschoss von 29, Schild von 28).
+  eigene Fotos (Nr. 25, 27, Erdgeschoss von 29, Schild von 28). Dazu gezeichnete Fronten für Nr. 12 bis 17,
+  Nr. 36 bis 50 (Billard-Vereinsheim bis Rathaus-Grill) und die VR-Bank am Platz gegenüber der Kirche.
+- **St. Martinus mit Turm:** Im LoD2 fehlt der Kirchturm. Er ist nachgebaut (Maße aus dem 3D-Mesh von Geobasis NRW),
+  mit Portal, Turmuhr und Schieferhelm; dazu der Kugelbrunnen vor der Bank.
 - **Spielfläche** 930 × 540 m. Start ist an der Hauptstraße beim Rathaus.
 
 ### Technik
@@ -150,6 +153,7 @@ Auf dem Besen:
 | `src/weapons/` | Waffen in der Hand: Hände, Animationen, Materialien und Modelle (`models/`) |
 | `src/osm-level.js`, `src/nrw-level.js` | Kulissen aus OpenStreetMap und aus den NRW-Geodaten |
 | `src/much-shops.js` | Ladenfronten an der Hauptstraße in Much |
+| `src/much-landmarks.js` | Kirchturm von St. Martinus, Kugelbrunnen, Wandtexturen für Kirche und Bank |
 | `src/navmap.js` | Karte und Navi |
 | `src/zombie-pak.js` | öffnet das verschlüsselte Zombie-Paket |
 | `src/pickups.js` | Munitionskisten |
@@ -254,6 +258,7 @@ Auf einen Webserver gehören nur `assets/models/zombie/zombie.pak` und `zombie.k
 | Taiga-47 (`assets/models/weapons/ak_tripo.glb`) | eigene Generierung mit Tripo (Pro-Konto) | ja |
 | Vintage 9 (`assets/models/weapons/pistol_meshy.glb`) | eigene Generierung mit Meshy (bezahlter Tarif, Rechte beim Ersteller) | ja |
 | Gelände, Gebäude, Hausnummern, Luftbild und Baumhöhen (`assets/nrw/`) | Geobasis NRW, [Datenlizenz Deutschland – Zero – 2.0](https://www.govdata.de/dl-de/zero-2-0) | ja |
+| Texturiertes 3D-Mesh von Much (`assets/nrw/much/mesh/`, nur zum Ausprobieren) | Geobasis NRW, 3D-Mesh 2025, Datenlizenz Deutschland – Zero – 2.0 | noch nicht |
 | Straßen und Wege (`assets/osm/`) | © [OpenStreetMap-Mitwirkende](https://www.openstreetmap.org/copyright), ODbL 1.0 | ja |
 | Soldaten-Figur (`assets/models/soldier/Soldier.glb`) | aus den three.js-Beispielen, ursprünglich Mixamo (Adobe); nur im Spiel, nicht einzeln zum Download | ja |
 | Spielmusik (`audio/hauptspiel.wav`) | Ausschnitt aus „Del Rio Bravo“ von Kevin MacLeod, CC BY 3.0 (Hinweis siehe unten) | ja |

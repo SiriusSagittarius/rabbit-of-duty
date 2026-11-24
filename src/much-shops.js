@@ -1,5 +1,5 @@
 /**
- * Läden an der Hauptstraße in Much – Platzhalter-Fassaden, bis eigene Fotos da sind.
+ * Läden an der Hauptstraße in Much (und die VR-Bank am Kirchplatz) – gezeichnete Fassaden oder eigene Fotos.
  *
  * Grundlage: Street-View-Screenshots, nur als Vorlage für Ladenfolge, Haustyp, Farben und Lage der
  * Schilder (nicht als Textur). Schilder sind einfache Schriftzüge in den Ladenfarben, keine nachgezeichneten Logos.
@@ -11,7 +11,8 @@
  *   draw  zeichnet die Ladenfront zur Straße (Erdgeschoss + Schildband), Maße in Metern, siehe painter()
  *   face  optional: Himmelsrichtung der Front ('N', 'O', 'S', 'W'), wenn der Laden nicht zur Straße zeigt
  *   near  optional: [x, z] in Spielkoordinaten nahe der Front, wenn das Haus mehrere Wände zur Straße hat
- *   more  optional: weitere Fronten desselben Hauses, je { name, draw, face?, near? }
+ *   jog   optional: größter Vor- oder Rücksprung (m), bis zu dem Wandstücke zur selben Front gehören (Standard 0,6)
+ *   more  optional: weitere Fronten desselben Hauses, je { name, draw, face?, near?, jog? }
  *   full  optional: das Bild bedeckt die ganze Wand bis in den Giebel (P.full, P.eave, P.roofAt(x) beim Zeichnen)
  *   photo optional: eigenes, entzerrtes Foto der ganzen Wand (assets/nrw/much/fronts/<photo>.webp, gebaut mit
  *         tools/rectify_fronts.py). Ist es da, ersetzt es draw() und bedeckt die ganze Wand; fehlt es, bleibt draw().
@@ -394,7 +395,465 @@ export const MUCH_SHOPS = {
       },
     }],
   },
+
+  // ---------- Südseite westlich vom Hazal: Parkplatz, dann Nr. 36–48 (Vorlage: Street-View-Bilder des Users, 24.11.) ----------
+  // Die Fronten zeigen nach Norden: links im Bild = Osten. Nr. 38 und 44 springen oft kurz vor und zurück (jog).
+  'Hauptstraße 36': {
+    name: 'Billard-Vereinsheim', wall: 'house2', tint: '#f3e4a6',             // gelber Putz, schwarzes Blendband überm Laden
+    draw(P) {
+      const { W, top } = P, m = W / 16.5, b0 = Math.min(2.9, top - 0.45);   // b0 = Unterkante des Blendbands
+      P.plaster('#f4f3ef');                                                   // weiße Ladenrahmung
+      P.rect(0, W, -P.plinth, 0.08, '#c9c9c4');
+      const win = (x0, x1, h0, word) => {
+        P.window(x0, x1, h0, b0 - 0.08, { frame: '#1c1c1c', t: 0.05, interior: 'empty' });
+        blinds(P, x0 + 0.05, x1 - 0.05, h0 + 0.05, b0 - 0.13);
+        if (word) P.text(word, (x0 + x1) / 2, h0 + (b0 - h0) * 0.48, 0.24, { color: '#1a1a1a', weight: '800', spacing: 0.02, maxW: (x1 - x0) * 0.6 });
+      };
+      win(0.15 * m, 3.35 * m, 0.6, 'BILLARD');
+      win(3.5 * m, 6.9 * m, 0.6, 'DART');
+      P.rect(7.15 * m, 11.05 * m, 0, b0, '#1e1f21');                          // Eingang: Glastür mit Seitenteilen
+      P.glass(7.25 * m, 8.55 * m, 0.1, b0 - 0.45, { light: true });
+      P.door(8.6 * m, 9.95 * m, 0.02, b0 - 0.45, { frame: '#1e1f21', glass: true });
+      P.glass(10.0 * m, 10.95 * m, 0.1, b0 - 0.45, { light: true });
+      P.glass(7.25 * m, 10.95 * m, b0 - 0.4, b0 - 0.08, { light: true });
+      P.text('BILLARD', 9.27 * m, 1.55, 0.12, { color: '#1a1a1a', weight: '800', maxW: 1.1 * m });
+      P.board(7.6 * m, 8.4 * m, 0.45, 1.25, { ellipse: true, bg: '#1f4fa0', border: '#e8e8e8', borderW: 0.03 });
+      P.text('PBC Much e.V.', 8.0 * m, 0.85, 0.07, { color: '#ffffff', weight: '700', maxW: 0.6 * m });
+      win(11.6 * m, 16.1 * m, 0.25);
+      P.rect(0, W, b0, top, '#1b1b1c');                                       // Blendband
+      P.rect(12.8 * m, W, b0 - 0.12, b0 + 0.38, '#77705a');                   // kleines Vordach über dem rechten Fenster
+      P.rect(12.8 * m, W, b0 - 0.12, b0 - 0.06, '#57513f');
+      P.board(7.2 * m, 9.85 * m, b0 - 0.02, top - 0.02, { bg: '#f6f6f4', border: '#bdbdbd', borderW: 0.015 });
+      P.text('BILLARD', 8.7 * m, b0 + (top - b0) * 0.62, 0.2, { color: '#161616', weight: '800', spacing: 0.02, maxW: 1.6 * m });
+      P.text('Vereinsheim', 8.7 * m, b0 + (top - b0) * 0.22, 0.08, { color: '#161616', maxW: 1.6 * m });
+    },
+  },
+  'Hauptstraße 38': {
+    // Von Osten: Durchfahrt zum Hof, Zahnärzte, Treppenhaus mit Hausnummer, Ernsting's family – Erdgeschoss auf einer
+    // Terrasse mit Sandsteinsockel und Geländer
+    name: "Zahnärzte Much · Ernsting's family", wall: 'house2', tint: '#f2e9c2', jog: 2.2,
+    draw(P) {
+      const { W, top } = P, m = W / 21.6, t0 = 0.6, oH = Math.min(2.75, top - 0.3);   // t0 = Höhe der Terrasse
+      P.plaster('#efe6bd');
+      const a0 = 0.3 * m, a1 = 3.1 * m, aH = Math.min(2.75, top - 0.25);       // Durchfahrt: dunkel, hinten der helle Hof
+      P.rect(a0, a1, -P.plinth, aH, '#2a2a28');
+      P.rect(a0 + 0.5, a1 - 0.5, -P.plinth, aH - 0.7, '#4a4c4a');
+      P.rect(a0 + 0.9, a1 - 0.9, -P.plinth, 1.0, '#8d918c');
+      P.stone(3.3 * m, W, -P.plinth, t0, [176, 160, 138]);                    // Sandsteinsockel, Treppe an der Durchfahrt
+      P.steps(3.3 * m, 4.6 * m, -P.plinth, t0, 4, '#a39a8c');
+      // Zahnärzte: Sandsteinrahmen, zwei Fenster und Tür
+      P.rect(3.3 * m, 9.3 * m, t0, top, '#bba98d');
+      P.window(3.6 * m, 5.4 * m, t0 + 0.1, oH - 0.45, { frame: '#5a5e63', t: 0.06, interior: 'shop' });
+      P.door(5.6 * m, 7.2 * m, t0, oH - 0.45, { frame: '#5a5e63', glass: true, double: true });
+      P.window(7.4 * m, 9.1 * m, t0 + 0.1, oH - 0.45, { frame: '#5a5e63', t: 0.06, interior: 'empty' });
+      P.board(3.6 * m, 5.4 * m, oH - 0.38, oH + 0.05, { bg: '#e7e7e4' });
+      P.text('ZAHNTECHNIK', 4.5 * m, oH - 0.16, 0.12, { color: '#3b3f44', weight: '600', spacing: 0.01, maxW: 1.6 * m });
+      P.board(5.5 * m, 7.9 * m, oH - 0.4, oH + 0.1, { bg: '#4a4d52' });
+      P.run([['ZAHNÄRZTE ', '#e8452c', '800'], ['MUCH', '#ffffff', '700']], 6.7 * m, oH - 0.23, 0.17, { maxW: 2.2 * m });
+      // Treppenhaus mit Hausnummer
+      P.rect(9.3 * m, 11.8 * m, t0, top, '#d9d6cc');
+      P.door(9.6 * m, 10.6 * m, t0, oH, { frame: '#7b8086', glass: true });
+      P.glass(10.7 * m, 11.6 * m, t0 + 0.1, top - 0.05, { light: true });
+      for (let k = 1; k < 4; k++) P.rect(10.7 * m, 11.6 * m, t0 + k * 0.9 - 0.025, t0 + k * 0.9 + 0.025, '#7b8086');
+      P.number('38', 9.45 * m, 2.1, 0.16);
+      // Ernsting's family: Schaufenster mit Kinderkleidung, Markise mit bunter Volantkante
+      const e0 = 11.9 * m, e1 = 21.4 * m;
+      P.window(e0, 15.6 * m, t0 + 0.05, oH, { frame: '#9ea3a8', t: 0.05, mullions: 1, interior: 'shop' });
+      P.door(15.75 * m, 16.95 * m, t0, oH, { frame: '#9ea3a8', glass: true });
+      P.window(17.1 * m, e1, t0 + 0.05, oH, { frame: '#9ea3a8', t: 0.05, mullions: 1, interior: 'shop' });
+      P.rect(e0 + 0.1, e0 + 1.2, t0 + 0.2, oH - 0.1, '#4f8fd0');              // Plakat (nur Farbfläche)
+      for (const [x, h] of [[13.6, 1.9], [14.6, 1.5], [18.0, 2.0], [19.8, 1.7]]) {   // „50 %“-Aufkleber
+        P.rect(x * m, x * m + 0.42, h, h + 0.32, '#d8262c');
+        P.text('50%', x * m + 0.21, h + 0.16, 0.12, { color: '#ffffff', weight: '800' });
+      }
+      clothes(P, 12.6 * m, 15.4 * m, t0 + 0.05, t0 + 1.15);
+      clothes(P, 17.6 * m, 20.9 * m, t0 + 0.05, t0 + 1.2);
+      awning(P, e0 - 0.2, e1 + 0.15, oH - 0.2, top);
+      P.board(9.4 * m, 11.7 * m, top - 0.42, top - 0.04, { bg: '#ffffff', border: '#e0e0e0', borderW: 0.015 });
+      P.text("Ernsting's family", 10.55 * m, top - 0.23, 0.12, { color: '#d43c2f', font: SCRIPT, weight: '700', maxW: 2.1 * m });
+      railing(P, 4.6 * m, W, t0, t0 + 0.95);
+    },
+  },
+  'Hauptstraße 40': {
+    name: 'Provinzial · Mucher Pflegedienst', wall: 'house2', tint: '#f7f7f5',
+    draw(P) {
+      const { W, top } = P, m = W / 9.2, oH = Math.min(2.7, top - 0.6), gr = '#1f8a3c';
+      P.plaster('#f6f6f4'); P.plinthBand('#9a9d9f', 0.12);
+      P.steps(3.0 * m, 5.6 * m, -P.plinth, 0.3, 2, '#b4b4b0');
+      P.window(0.02 * m, 1.72 * m, 0.25, oH, { frame: '#f4f4f2', t: 0.06, interior: 'shop' });
+      P.rect(1.72 * m, 1.95 * m, 0.25, oH, gr);
+      P.window(1.97 * m, 3.0 * m, 0.25, oH, { frame: '#f4f4f2', t: 0.06, interior: 'empty' });
+      P.door(3.1 * m, 4.05 * m, 0.3, oH, { frame: '#f4f4f2', glass: true });
+      P.number('40', 4.27 * m, oH - 0.4, 0.13);
+      P.door(4.45 * m, 5.45 * m, 0.3, oH, { frame: '#f4f4f2', glass: true });
+      P.rect(5.8 * m, 6.05 * m, 0.25, oH, gr);
+      P.window(6.08 * m, 8.45 * m, 0.25, oH, { frame: '#f4f4f2', t: 0.06, interior: 'cafe' });
+      P.text('Mucher Pflegedienst', 7.27 * m, oH - 0.6, 0.12, { color: '#ffffff', weight: '700', maxW: 1.9 * m });
+      const s0 = oH + 0.12, s1 = top - 0.04;                                  // Schilder: Provinzial (grün), Pflegedienst
+      P.board(0, 2.65 * m, s0, s1, { bg: '#d9dbdc' });
+      P.board(0, 1.55 * m, s0 + 0.04, s1 - 0.04, { bg: gr });
+      P.text('PROVINZIAL', 0.78 * m, (s0 + s1) / 2, 0.22, { color: '#ffffff', weight: '800', maxW: 1.4 * m });
+      P.board(1.6 * m, 2.6 * m, s0 + 0.06, s1 - 0.06, { bg: gr, border: '#ffffff', borderW: 0.015 });
+      P.text('Geschäftsstelle', 2.1 * m, (s0 + s1) / 2 + 0.06, 0.065, { color: '#ffffff', weight: '700', maxW: 0.9 * m });
+      P.text('Boris Wisser', 2.1 * m, (s0 + s1) / 2 - 0.06, 0.065, { color: '#ffffff', weight: '700', maxW: 0.9 * m });
+      P.board(2.65 * m, 3.75 * m, s0, s1, { bg: '#c9cbcd' });
+      P.board(3.75 * m, 9.15 * m, s0, s1, { bg: '#f1f2f4', border: '#d4d6d9', borderW: 0.015 });
+      P.text('Mucher Pflegedienst', 6.45 * m, (s0 + s1) / 2, 0.24, { color: '#2e3034', weight: '700', maxW: 4.4 * m });
+    },
+  },
+  'Hauptstraße 42': {
+    name: 'Lebenshilfe Rhein Sieg', wall: 'house2', tint: '#eef0f2',           // modern, Büro im Erdgeschoss, 4 m hinter Nr. 40
+    draw(P) {
+      const { W, top } = P, m = W / 9.5, oH = Math.min(2.55, top - 0.7), fr = '#3c4045';
+      P.plaster('#f3f4f5'); P.plinthBand('#8e9398', 0.12);
+      P.rect(0.3 * m, 6.0 * m, oH, top, '#5c6166');                           // dunkles Band über dem Büro
+      P.rect(0.4 * m, 5.9 * m, 0.1, oH, fr);
+      for (const [a, b] of [[0.45, 1.75], [1.8, 3.4], [3.45, 4.95]]) P.glass(a * m, b * m, 0.16, oH - 0.06, { light: true, interior: 'empty' });
+      P.door(5.0 * m, 5.85 * m, 0.1, oH, { frame: fr, glass: true });
+      P.text('Lebenshilfe Rhein Sieg e.V.', 3.0 * m, oH - 0.32, 0.13, { color: '#ffffff', weight: '700', maxW: 3.2 * m });
+      P.canopy(6.6 * m, 8.6 * m, oH + 0.15, 0.08, '#55595e');
+      P.door(7.0 * m, 8.1 * m, 0.12, oH - 0.05, { frame: '#4a4e53', panel: '#4a4e53' });
+      P.number('42', 8.35 * m, 1.9, 0.14);
+      P.rect(6.3 * m, 6.75 * m, 0.9, 1.5, '#9ea3a8');                          // Briefkästen
+    },
+  },
+  // Haus 44: langer Bau mit Fachwerkgiebeln. Vor dem Erdgeschoss liegt ein Laubengang unter einem Vordach mit dunklem
+  // Blendband; im LoD2 ist das Vordach ein eigener Block bis zum Boden („Überdachung“, ohne Hausnummer), der die
+  // Ladenwände verdeckt. Die Läden kommen deshalb auf seine Straßenseite: Ostteil (leerer Laden, ARTHEM, darüber
+  // Studienkreis), Mitte (Eingang „Haus 44“), Westteil (Bergische Apotheke, Ergotherapie).
+  'Hauptstraße 44': { name: 'Haus 44', wall: 'fachwerk', tint: '#ffffff' },
+  'id:DENW46AL2Yc0004A': {
+    name: 'Haus 44 (Ostteil)', wall: 'house2', tint: '#f4f4f2', near: [111.3, -38.8],
+    draw(P) {
+      const { W, top } = P, m = W / 19.7, f0 = 0.8, oH = Math.min(2.65, top - 0.6), fr = '#3a3d41';
+      P.plaster('#f3f3f1');
+      P.rect(1.0 * m, 15.9 * m, f0 - 0.05, oH, fr);
+      P.glass(1.1 * m, 4.95 * m, f0 + 0.05, oH - 0.08, {});                     // leerer Laden mit Lamellen
+      blinds(P, 1.1 * m, 4.95 * m, f0 + 0.05, oH - 0.08);
+      P.door(5.1 * m, 7.5 * m, f0, oH - 0.05, { frame: fr, glass: true, double: true });
+      P.rect(5.55 * m, 5.95 * m, f0 + 0.9, f0 + 1.35, '#ffffff');              // Aushang
+      for (const [a, b] of [[7.8, 10.5], [10.6, 13.2], [13.3, 15.8]]) P.glass(a * m, b * m, f0 + 0.05, oH - 0.08, { light: true });
+      for (const x of [8.4, 9.7, 11.3, 12.5, 15.2]) {                           // ARTHEM: Bilder auf Staffeleien
+        P.rect(x * m - 0.02, x * m + 0.02, f0 + 0.05, f0 + 1.45, '#a8865a');
+        P.rect(x * m - 0.3, x * m + 0.3, f0 + 0.75, f0 + 1.35, `hsl(${P.rnd() * 360 | 0},45%,${45 + P.rnd() * 20 | 0}%)`);
+      }
+      P.rect(13.75 * m, 13.75 * m + 0.9, f0 + 0.5, f0 + 1.4, '#1e1f23');
+      P.board(13.75 * m + 0.15, 13.75 * m + 0.75, f0 + 0.65, f0 + 1.25, { ellipse: true, bg: '#d4a62a' });
+      P.board(8.0 * m, 12.4 * m, oH - 0.55, oH - 0.14, { bg: '#f7f5ef' });
+      P.text('20 Jahre ARTHEM', 10.2 * m, oH - 0.345, 0.2, { color: '#3a3a3a', font: SERIF, maxW: 4.0 * m });
+      P.stone(0.9 * m, 5.0 * m, -P.plinth, f0 + 0.05, [150, 142, 128]);       // Steinmauern, Treppe in der Mitte
+      P.stone(7.6 * m, 15.9 * m, -P.plinth, f0, [150, 142, 128]);
+      P.steps(5.0 * m, 7.6 * m, -P.plinth, f0, 5, '#9c978e');
+      arcade(P, 15.9 * m, W, oH, [17.6 * m]);                                  // Laubengang zum Eingang „Haus 44“
+      P.rect(0.8 * m, W, oH, top, '#4d5156');                                  // Blendband mit Studienkreis-Schild
+      P.board(12.3 * m, 15.6 * m, oH + 0.08, top - 0.05, { bg: '#d8222a' });
+      P.text('Studienkreis', 13.95 * m, oH + (top - oH) * 0.6, 0.24, { color: '#ffffff', weight: '800', maxW: 3.0 * m });
+      P.text('Profi-Nachhilfe', 13.95 * m, oH + (top - oH) * 0.25, 0.08, { color: '#ffffff', weight: '600', maxW: 3.0 * m });
+    },
+    more: [{
+      name: 'Haus 44 (Eingang)', near: [99.1, -39.9],
+      draw(P) {
+        const { W, top } = P, oH = Math.min(2.65, top - 0.6);
+        arcade(P, 0, W, oH, []);
+        P.door(0.25, W - 0.25, 0, oH - 0.55, { frame: '#3a3d41', glass: true, double: true });
+        P.rect(0, W, oH, top, '#4d5156');
+        P.board(0.1, W - 0.1, oH + 0.08, top - 0.08, { bg: '#2f5fa8', border: '#ffffff', borderW: 0.02 });
+        P.text('Haus 44', W / 2, (oH + top) / 2, 0.24, { color: '#ffffff', weight: '700', maxW: W - 0.4 });
+      },
+    }, {
+      name: 'Haus 44 (Westteil)', near: [86.7, -40.05],
+      draw(P) {
+        const { W, top } = P, m = W / 19.8, oH = Math.min(2.65, top - 0.6), fr = '#3a3d41', blue = '#2f6fb5';
+        P.plaster('#f3f3f1');
+        arcade(P, 0, 4.0 * m, oH, [1.5 * m, 3.1 * m]);                         // Laubengang mit Schaukästen
+        P.rect(4.0 * m, W, -P.plinth, oH, fr);
+        for (const [a, b] of [[4.3, 6.2], [6.3, 8.2], [8.3, 10.1]]) P.glass(a * m, b * m, 0.35, oH - 0.08, { light: true, interior: 'pharmacy' });
+        P.door(10.3 * m, 11.6 * m, 0, oH - 0.05, { frame: fr, glass: true });
+        P.door(11.8 * m, 13.3 * m, 0, oH - 0.05, { frame: fr, glass: true });    // Ergotherapie: Tür und Milchglasfenster
+        P.rect(11.95 * m, 13.15 * m, 0.3, oH - 0.6, 'rgba(236,240,242,0.85)');
+        P.text('Praxis für', 12.55 * m, 1.75, 0.07, { color: blue, maxW: 1.1 * m });
+        P.text('Ergotherapie', 12.55 * m, 1.6, 0.07, { color: blue, maxW: 1.1 * m });
+        for (const [a, b] of [[13.45, 16.5], [16.6, 19.7]]) P.glass(a * m, b * m, 0.1, oH - 0.08, { frosted: 0.85 });
+        P.text('Praxis für Ergotherapie', 15.0 * m, 1.95, 0.15, { color: blue, font: SERIF, maxW: 2.8 * m });
+        P.text('Frank Erdmann', 15.0 * m, 1.0, 0.13, { color: blue, font: SERIF, maxW: 2.8 * m });
+        P.stone(5.5 * m, 10.2 * m, -P.plinth, 0.4, [168, 152, 130]);            // Steinmauern vor dem Laden
+        P.stone(13.4 * m, W, -P.plinth, 0.55, [168, 152, 130]);
+        P.rect(0, W, oH, top, '#55595e');                                      // Blendband, Apothekenschild darunter
+        P.board(4.35 * m, 9.9 * m, oH - 0.42, oH + 0.06, { bg: '#ffffff', border: '#d8dcd8', borderW: 0.015 });
+        P.text('Bergische Apotheke', 7.12 * m, oH - 0.18, 0.28, { color: '#43a047', style: 'italic', weight: '700', font: SERIF, maxW: 5.0 * m });
+      },
+    }],
+  },
+  'Hauptstraße 48': {
+    // Links daneben das Westende von Haus 44 (Apothekenschild), rechts die Einfahrt zum Parkplatz, dahinter der Rathaus-Grill
+    name: 'Renani fashion trends', wall: 'house2', tint: '#f1f1ef',
+    draw(P) {
+      const { W, top } = P, m = W / 10.95, oH = Math.min(2.6, top - 0.75), post = '#3b302b';
+      P.plaster('#f0f0ee'); P.plinthBand('#6f6a64', 0.15);
+      for (const [a, b] of [[1.5, 3.23], [3.53, 5.26], [6.62, 8.35], [8.65, 10.45]]) P.window(a * m, b * m, 0.15, oH, { frame: post, t: 0.05, interior: 'shop' });
+      P.rect(5.56 * m, 6.62 * m, 0, oH, '#2a2522');                             // Eingangsnische, Tür offen
+      P.door(5.66 * m, 6.52 * m, 0.02, oH - 0.3, { frame: post, open: true });
+      for (const [a, b] of [[1.0, 1.5], [3.23, 3.53], [5.26, 5.56], [6.54, 6.62], [8.35, 8.65], [10.45, 10.95]]) P.rect(a * m, b * m, -P.plinth, oH, post);
+      for (const x of [1.13, 3.29, 8.53, 10.8]) P.board(x * m - 0.13, x * m + 0.13, 2.0, 2.26, { ellipse: true, bg: '#f4f4f0' });   // Kugelleuchten
+      clothes(P, 1.2 * m, 3.1 * m, 0.25, 1.3);                                  // Kleiderständer vor den Fenstern
+      clothes(P, 3.7 * m, 5.1 * m, 0.25, 1.3);
+      clothes(P, 6.9 * m, 8.2 * m, 0.25, 1.3);
+      clothes(P, 9.0 * m, 10.6 * m, 0.25, 1.3);
+      P.rect(0.45 * m, W, oH, top - 0.12, '#3a3b3d');                           // Blende: dunkler Kasten, Mitte höher
+      P.rect(4.4 * m, 7.1 * m, oH, top, '#3a3b3d');
+      P.rect(0.45 * m, W, oH, oH + 0.05, '#2a2b2d');
+      P.board(4.59 * m, 6.92 * m, oH + 0.1, top - 0.05, { bg: '#fbfbfa' });
+      P.text('RENANI', 5.75 * m, oH + (top - oH) * 0.62, 0.26, { color: '#2b2b2b', font: SERIF, weight: '600', spacing: 0.03, maxW: 1.9 * m });
+      P.text('fashion trends', 5.75 * m, oH + (top - oH) * 0.27, 0.12, { color: '#2b2b2b', font: SERIF, weight: '400', maxW: 1.9 * m });
+    },
+  },
+  'Hauptstraße 50': {
+    // Rathaus-Grill: Eckhaus westlich der Einfahrt neben Renani; Erdgeschoss mit weißen Klinkerriemchen, oben gelber Putz.
+    // Linker Teil nach Foto (Ecke, Fenster, Speisekarte, Tür); den rechten Teil zeigt kein Bild – dort nur weitergeführt.
+    name: 'Rathaus-Grill', wall: 'house2', tint: '#f1e3a8',
+    draw(P) {
+      const { W, top } = P, oH = Math.min(2.3, top - 0.9), wood = '#b39b6c', s0 = oH + 0.42, s1 = Math.min(oH + 0.82, top - 0.12);
+      tiles(P, 0, W, -P.plinth, s1 + 0.1);
+      P.plaster('#efe0a6', s1 + 0.1, top);                                    // gelber Putz darüber
+      P.rect(0, W, -P.plinth, 0.05, '#b9b9b4');
+      P.rect(0.08, 0.2, -P.plinth, top, '#a7abae');                            // Fallrohr an der Ecke
+      const win = (x0, x1) => {
+        P.window(x0, x1, 0.2, oH, { frame: '#d7d7d3', t: 0.06, interior: 'cafe' });
+        P.rect(x0 - 0.06, x1 + 0.06, 0.12, 0.2, '#c9c9c5');
+      };
+      win(3.5, 5.3);
+      P.rect(5.85, 6.75, 1.0, 2.1, wood);                                      // Speisekartenkasten
+      P.rect(5.93, 6.67, 1.08, 2.02, '#f4f2ea');
+      P.steps(6.9, 9.0, -P.plinth, 0.1, 1, '#b5634a');                         // rotbraune Stufe
+      P.door(7.0, 8.9, 0.1, oH, { frame: wood, glass: true, double: true });
+      P.rect(9.1, 9.4, 1.3, 1.6, '#f0f0ee');                                   // Klingelkasten
+      for (const x0 of [10.6, 13.4]) if (x0 + 1.8 < W - 0.3) win(x0, x0 + 1.8);
+      const a = 2.0, b = Math.min(W - 0.2, 9.6);                               // Schild weiß mit grünem Rand, Lampen darüber
+      P.board(a, b, s0, s1, { bg: '#fbfbf8', border: '#2f6b3a', borderW: 0.03, radius: 0.12 });
+      P.text('SCHNELL-RESTAURANT', (a + b) / 2, s1 - 0.1, 0.085, { color: '#1d1d1d', weight: '700', spacing: 0.02, maxW: (b - a) * 0.5 });
+      P.text('Rathaus-Grill', (a + b) / 2, s0 + 0.14, 0.18, { color: '#1d1d1d', font: '"Old English Text MT", "UnifrakturMaguntia", Georgia, serif', weight: '700', maxW: (b - a) * 0.5 });
+      for (let x = 2.4; x < b; x += 1.0) {
+        P.rect(x - 0.015, x + 0.015, s1, top - 0.08, '#d9d9d6');
+        P.board(x - 0.14, x + 0.14, top - 0.16, top - 0.04, { ellipse: true, bg: '#f2f2f0', border: '#c9c9c6', borderW: 0.01 });
+      }
+    },
+  },
+
+  // ---------- Westlich vom Kirchplatz und gegenüber (Vorlage: Street-View-Bilder des Users vom 24.11.) ----------
+  'Hauptstraße 12': {
+    name: 'Hauptstraße 12', wall: 'house2', tint: '#f6f6f4',             // weißes Giebelhaus am Kirchplatz
+    draw(P) {
+      const { W, top } = P, oH = Math.min(2.45, top - 0.8);
+      P.plaster('#f3f3f1'); P.plinthBand('#8d9196', 0.42);
+      P.window(0.06 * W, 0.36 * W, 0.62, oH, { frame: '#f7f7f5', outer: '#d9dadb', t: 0.08, mullions: 1, transom: 0.5, interior: 'poster' });
+      P.steps(0.42 * W, 0.58 * W, -P.plinth, 0.42, 2, '#a7a49e');
+      P.door(0.44 * W, 0.56 * W, 0.42, oH, { frame: '#f7f7f5', glass: true, transom: 0.45 });
+      P.window(0.64 * W, 0.92 * W, 0.62, oH, { frame: '#f7f7f5', outer: '#d9dadb', t: 0.08, mullions: 1, interior: 'poster' });
+      P.rect(0.7 * W, 0.78 * W, 1.0, 1.7, 'rgba(232,120,40,0.75)');           // orangefarbenes Plakat im Fenster
+      P.rect(0, W, top - 0.5, top - 0.44, 'rgba(0,0,0,0.08)');                // Gesimslinie über dem Erdgeschoss
+    },
+  },
+  'Hauptstraße 14': {
+    name: 'Haetham Hair Style', wall: 'slate', tint: '#ffffff',             // Schieferhaus, Friseur über Stufen
+    draw(P) {
+      const { W, top } = P, gf = 0.7, oH = top - 0.45;
+      P.slate(0, W, 0, top);
+      P.rect(0, W, -P.plinth, gf, '#5f6269');                                 // grauer Sockel
+      P.rect(0.62 * W, 0.66 * W, 0.15, 0.3, '#3a3d42');                        // Kellerlüftung
+      P.rect(0, W, gf, oH + 0.12, '#f3f3f1');                                  // weißer Ladenrahmen
+      const grid = (x0, x1, cols, poster) => {
+        P.window(x0, x1, gf + 0.12, oH - 0.08, { frame: '#f6f6f4', t: 0.06, mullions: cols - 1 });
+        for (let k = 1; k < 3; k++) P.rect(x0, x1, gf + 0.12 + (oH - gf - 0.2) * k / 3 - 0.025, gf + 0.12 + (oH - gf - 0.2) * k / 3 + 0.025, '#f6f6f4');
+        if (poster) {                                                            // schwarze Werbefolie unten im Fenster
+          P.rect(x0 + 0.06, x1 - 0.06, gf + 0.18, gf + 0.85, '#141414');
+          P.text('HAETHAM', (x0 + x1) / 2, gf + 0.6, 0.12, { color: '#c9a24c', font: SERIF, weight: '700', maxW: (x1 - x0) * 0.4 });
+          P.text('HAIR STYLE', (x0 + x1) / 2, gf + 0.42, 0.07, { color: '#c9a24c', font: SERIF, weight: '700', maxW: (x1 - x0) * 0.4 });
+        }
+      };
+      grid(0.03 * W, 0.4 * W, 4, true);
+      P.steps(0.42 * W, 0.62 * W, -P.plinth, gf, 5, '#a9a59d');
+      P.door(0.45 * W, 0.59 * W, gf, oH - 0.05, { frame: '#f6f6f4', open: true });
+      grid(0.64 * W, 0.98 * W, 4, true);
+      P.rect(0.405 * W, 0.44 * W, gf + 0.3, oH - 0.3, '#151515');              // Preistafel neben der Tür
+      P.rect(0, W, oH + 0.12, oH + 0.18, '#d8d8d6');                           // Kante des Vordachs
+      P.board(0.33 * W, 0.72 * W, oH - 0.62, oH + 0.02, { bg: '#121212', border: '#b8954a', borderW: 0.02 });
+      P.text('HAETHAM', 0.525 * W, oH - 0.2, 0.26, { color: '#d2ac57', font: SERIF, weight: '700', spacing: 0.02, maxW: 0.3 * W });
+      P.text('HAIR STYLE', 0.525 * W, oH - 0.47, 0.13, { color: '#d2ac57', font: SERIF, weight: '700', spacing: 0.02, maxW: 0.2 * W });
+      for (const xl of [0.3 * W, 0.75 * W]) {                                  // zwei schwarze Laternen
+        P.rect(xl - 0.02, xl + 0.02, oH - 0.75, oH - 0.2, '#1b1b1b');
+        P.rect(xl - 0.13, xl + 0.13, oH - 0.62, oH - 0.22, '#222222');
+        P.rect(xl - 0.09, xl + 0.09, oH - 0.56, oH - 0.28, 'rgba(240,236,220,0.55)');
+      }
+    },
+  },
+  'Hauptstraße 16': {
+    name: 'Wok Mei', wall: 'slate', tint: '#ffffff',                       // Erdgeschoss mit grauem Wellblech verkleidet
+    draw(P) {
+      const { W, top } = P, gf = 0.5;
+      P.rect(0, W, -P.plinth, top, '#9ba6b2');
+      for (let x = 0; x < W; x += 0.1) {                                       // senkrechte Wellen
+        P.rect(x, x + 0.035, gf, top, 'rgba(255,255,255,0.2)');
+        P.rect(x + 0.055, x + 0.08, gf, top, 'rgba(30,40,55,0.14)');
+      }
+      P.rect(0, W, -P.plinth, gf, '#5b5f66');                                 // dunkler Sockel mit Kellerfenstern
+      for (const xc of [0.2 * W, 0.47 * W, 0.86 * W]) P.rect(xc - 0.25, xc + 0.25, 0.08, 0.3, '#33363b');
+      const win = (x0, x1) => {
+        P.rect(x0 - 0.08, x1 + 0.08, 0.92, 2.78, '#4a4f56');                   // dunkle Laibung
+        P.rect(x0, x1, 2.55, 2.72, '#7a5536');                                 // Rollladenkasten
+        P.window(x0, x1, 1.0, 2.55, { frame: '#f2f2f0', t: 0.07, mullions: 1, frosted: 0.92 });
+        P.rect(x0 - 0.12, x1 + 0.12, 0.86, 0.94, '#62676e');                   // Fensterbank
+      };
+      win(0.085 * W, 0.255 * W); win(0.28 * W, 0.415 * W); win(0.435 * W, 0.555 * W);
+      P.rect(0.795 * W, 0.92 * W, 0.92, 2.6, '#4a4f56');
+      P.window(0.805 * W, 0.91 * W, 1.0, 2.5, { frame: '#f2f2f0', t: 0.06, interior: 'display' });
+      // Eingang: Nische mit Stufen, helle Holzzarge
+      P.rect(0.645 * W, 0.725 * W, -P.plinth, 2.62, '#e8e6e0');
+      P.steps(0.645 * W, 0.725 * W, -P.plinth, gf + 0.1, 4, '#aaa7a0');
+      P.door(0.655 * W, 0.695 * W, gf + 0.1, 2.5, { frame: '#c8a46e', glass: true });
+      for (const xc of [0.6 * W, 0.77 * W]) {                                  // grüne Speisekarten-Kästen
+        P.rect(xc - 0.23, xc + 0.23, 1.25, 1.95, '#2f7a3c');
+        P.rect(xc - 0.17, xc + 0.17, 1.32, 1.82, '#efe9da');
+      }
+      P.board(0.6 * W, 0.77 * W, 2.7, top - 0.05, { bg: '#fbfaf7', border: '#d8322b', borderW: 0.025, radius: 0.08 });
+      P.text('Schnell-Restaurant', 0.685 * W, top - 0.17, 0.09, { color: '#d8322b', weight: '700', font: SERIF, maxW: 0.12 * W });
+      P.text('Wok Mei', 0.685 * W, top - 0.38, 0.22, { color: '#e0302a', weight: '800', maxW: 0.13 * W });
+      P.text('Chinesische Spezialitäten', 0.685 * W, 2.79, 0.065, { color: '#d8322b', weight: '700', font: SERIF, maxW: 0.14 * W });
+    },
+  },
+  'Hauptstraße 17': {
+    name: 'Schublade', wall: 'fachwerk', tint: '#ffffff',                  // Fachwerk, Erdgeschoss voller Glyzinien
+    draw(P) {
+      const { W, top } = P, gf = 0.42, beam = '#1e1c1a';
+      P.plaster('#f4f3ef'); P.plinthBand('#3d3d3c', 0.25);
+      for (const f of [0, 0.34, 1]) P.rect(Math.max(0, f * W - 0.09), Math.min(W, f * W + 0.09), 0.25, top, beam);
+      P.rect(0, W, top - 0.22, top, beam);
+      P.steps(0.04 * W, 0.32 * W, -P.plinth, gf, 4, '#a19c93');
+      P.door(0.08 * W, 0.28 * W, gf, 2.7, { frame: '#c3c7ca', glass: true, double: true });
+      P.window(0.42 * W, 0.88 * W, 0.7, 2.75, { frame: '#f6f6f4', t: 0.06, mullions: 5, interior: 'cafe' });
+      for (let k = 1; k < 4; k++) P.rect(0.42 * W, 0.88 * W, 0.7 + 2.05 * k / 4 - 0.025, 0.7 + 2.05 * k / 4 + 0.025, '#f6f6f4');
+      P.board(0.5 * W, 0.62 * W, 1.0, 1.45, { bg: '#ffffff', border: '#cfcfcf' });
+      P.text('Schublade', 0.56 * W, 1.24, 0.11, { color: '#1b1b1b', font: '"Old English Text MT", "UnifrakturMaguntia", Georgia, serif', weight: '700', maxW: 0.1 * W });
+      // Glyzinie: Blätterbüschel rings um das Fenster, über dem Pfosten und an der Tür
+      const leaf = (x0, x1, h0, h1, n) => {
+        for (let i = 0; i < n; i++) P.shrub(x0 + P.rnd() * (x1 - x0), h0 + P.rnd() * (h1 - h0) - 0.2, 0.5 + P.rnd() * 0.4, 0.45);
+      };
+      leaf(0.3 * W, 0.44 * W, 0.2, 3.0, 26);
+      leaf(0.86 * W, 0.98 * W, 0.2, 3.0, 22);
+      leaf(0.3 * W, 0.98 * W, 2.65, 3.15, 40);
+      leaf(0.4 * W, 0.95 * W, 0.15, 0.75, 22);
+      leaf(0.27 * W, 0.33 * W, 1.5, 3.0, 8);
+      P.text('Schublade', 0.66 * W, top - 0.42, 0.28, { color: '#151515', font: '"Old English Text MT", "UnifrakturMaguntia", Georgia, serif', weight: '700', maxW: 0.25 * W });
+    },
+  },
+  'Hauptstraße 15': {
+    name: 'GeschmackSache', wall: 'fachwerk', tint: '#ffffff',             // Fachwerk mit grünen Läden, direkt neben der Sparkasse
+    draw(P) {
+      const { W, top } = P, gf = 0.45, oH = Math.min(2.6, top - 0.5), beam = '#1e1c1a';
+      P.plaster('#f5f4f0'); P.plinthBand('#2f3236', gf);
+      for (const f of [0, 0.235, 0.62, 1]) P.rect(Math.max(0, f * W - 0.08), Math.min(W, f * W + 0.08), gf, top, beam);
+      P.rect(0, W, top - 0.2, top, beam);
+      P.steps(0.03 * W, 0.22 * W, -P.plinth, gf, 3, '#8d9095');
+      P.door(0.06 * W, 0.2 * W, gf, oH, { frame: '#f6f6f4', glass: true });
+      P.window(0.27 * W, 0.6 * W, gf + 0.2, oH, { frame: '#f6f6f4', t: 0.08, mullions: 1, interior: 'empty' });
+      P.window(0.65 * W, 0.96 * W, gf + 0.2, oH, { frame: '#f6f6f4', t: 0.08, mullions: 1, interior: 'empty' });
+      P.rect(0.4 * W, 0.405 * W, gf + 0.25, gf + 1.3, '#8a6b48');               // Staffelei im Schaufenster
+      P.rect(0.37 * W, 0.44 * W, gf + 0.95, gf + 1.45, 'rgba(240,238,232,0.8)');
+      const s0 = oH + 0.1, s1 = top - 0.26;                                     // schlichtes Namensschild über den Schaufenstern
+      P.board(0.3 * W, 0.93 * W, s0, s1, { bg: '#2f4a3a', border: '#d9cfa8', borderW: 0.02 });
+      P.text('GeschmackSache', 0.615 * W, (s0 + s1) / 2, 0.26, { color: '#f1e9d0', font: SERIF, weight: '700', spacing: 0.01, maxW: 0.55 * W });
+    },
+  },
+
+  // ---------- VR-Bank Rhein-Sieg am Platz gegenüber der Kirche (Vorlage: Street-View-Bild des Users, 24.11.) ----------
+  // Front zum Platz mit Kugelbrunnen (Brunnen und Kirchturm: src/much-landmarks.js). Die Front besteht im LoD2 aus zwei
+  // gegeneinander versetzten Stücken; Wände und Obergeschoss zeigen die Bank-Ebenen (bank_eg/bank_og in nrw-level.js).
+  'Dr.Wirtz-Straße 3': {
+    name: 'VR-Bank Rhein-Sieg', wall: 'bank_eg', tint: '#ffffff', face: 'S', near: [373.4, -73.3],
+    draw(P) { bankFront(P, true); },
+    more: [{ name: 'VR-Bank Rhein-Sieg (links)', face: 'S', near: [368.1, -72.6], draw(P) { bankFront(P, false); } }],
+  },
 };
+
+/** Erdgeschoss der VR-Bank: Glasfelder in dunklen Rahmen, dunkle Blende; sign = mit Schriftzug über dem Eingang. */
+function bankFront(P, sign) {
+  const { W, top } = P, b0 = 2.85;
+  P.rect(0, W, -P.plinth, top, '#9fd0c6');
+  P.rect(0, W, -P.plinth, 0.35, '#5f6468');
+  P.rect(0.08, W - 0.08, 0.35, b0, '#3d4246');
+  const n = Math.max(1, Math.round((W - 0.16) / 1.4)), bw = (W - 0.16) / n;
+  for (let i = 0; i < n; i++) {
+    const x0 = 0.08 + i * bw, x1 = x0 + bw;
+    if (sign && i === n - 1) P.door(x0 + 0.06, x1 - 0.06, 0.35, b0 - 0.08, { frame: '#3d4246', glass: true, double: bw > 1.6 });
+    else P.glass(x0 + 0.06, x1 - 0.06, 0.41, b0 - 0.08, { light: true, interior: 'empty' });
+  }
+  P.rect(0.08, W - 0.08, 2.3, 2.35, '#3d4246');                                // Kämpfer
+  P.rect(0, W, b0, top, '#4a4e53');                                            // Blende
+  if (sign) {
+    P.board(0.2, W - 0.2, b0 + 0.08, top - 0.05, { bg: '#ffffff', border: '#d0d4d8', borderW: 0.015 });
+    P.text('VR-Bank Rhein-Sieg', W / 2, (b0 + top) / 2 + 0.015, 0.25, { color: '#0a5aa5', weight: '700', maxW: W - 0.6 });
+  }
+}
+
+/** Senkrechte Lamellen hinter Glas (Büro, Vereinsheim). */
+function blinds(P, x0, x1, h0, h1) {
+  P.rect(x0, x1, h0, h1, 'rgba(226,229,231,0.82)');
+  for (let x = x0 + 0.045; x < x1; x += 0.09) P.rect(x, Math.min(x1, x + 0.012), h0, h1, 'rgba(0,0,0,0.07)');
+}
+
+/** Laubengang hinter dem Blendband: dunkel, hinten hellere Wand; xs = Schaukästen (weiß mit schwarzem Dach). */
+function arcade(P, x0, x1, oH, xs) {
+  P.rect(x0, x1, -P.plinth, oH, '#2c2d30');
+  P.rect(x0 + 0.3, x1 - 0.3, -P.plinth, oH - 0.45, '#6d7075');
+  P.rect(x0, x1, -P.plinth, 0.02, '#8a8780');
+  for (const x of xs) {
+    P.rect(x - 0.32, x + 0.32, 0.45, 1.85, '#e9ebec');
+    P.glass(x - 0.26, x + 0.26, 0.55, 1.75, { light: true, interior: 'poster' });
+    P.rect(x - 0.4, x + 0.4, 1.85, 2.15, '#1d1e20');
+    P.rect(x - 0.05, x + 0.05, -P.plinth, 0.45, '#5b5e62');
+  }
+}
+
+/** Weiße, glasierte Klinkerriemchen im Verband. */
+function tiles(P, x0, x1, h0, h1) {
+  P.rect(x0, x1, h0, h1, '#f1f1ee');
+  for (let h = h0, row = 0; h < h1; h += 0.075, row++) {
+    P.rect(x0, x1, h, Math.min(h1, h + 0.009), 'rgba(140,140,135,0.35)');
+    for (let x = x0 + (row % 2) * 0.12; x < x1; x += 0.24) P.rect(x, Math.min(x1, x + 0.009), h, Math.min(h1, h + 0.075), 'rgba(140,140,135,0.3)');
+  }
+}
+
+/** Kleiderständer vor einem Laden: Stange, darunter bunte Kleidungsstücke. */
+function clothes(P, x0, x1, h0, h1) {
+  P.rect(x0 - 0.05, x0 - 0.02, h0 - 0.15, h1 + 0.05, '#9aa0a6');
+  P.rect(x1 + 0.02, x1 + 0.05, h0 - 0.15, h1 + 0.05, '#9aa0a6');
+  for (let x = x0; x < x1 - 0.02;) {
+    const w = 0.03 + P.rnd() * 0.035;
+    P.rect(x, Math.min(x1, x + w), h0 + P.rnd() * 0.35, h1 - 0.02, `hsl(${P.rnd() * 360 | 0},${45 + P.rnd() * 35 | 0}%,${50 + P.rnd() * 25 | 0}%)`);
+    x += w + 0.005;
+  }
+  P.rect(x0 - 0.05, x1 + 0.05, h1 - 0.02, h1 + 0.02, '#b8bcc0');
+}
+
+/** Markise von vorn: helles Tuch, unten ein Volant aus bunten Bögen. */
+function awning(P, x0, x1, h0, h1) {
+  P.rect(x0, x1, h0 + 0.18, h1, '#ece7dc');
+  for (let x = x0 + 0.6; x < x1; x += 1.2) P.rect(x, x + 0.02, h0 + 0.18, h1, 'rgba(0,0,0,0.05)');
+  const cols = ['#e5505e', '#f3c445', '#5a8ed8', '#c79ade', '#79c26f', '#ef8bb5', '#ee7f3b'];
+  for (let i = 0, x = x0; x < x1 - 0.01; i++, x += 0.3) {
+    const c = cols[i % cols.length], xe = Math.min(x1, x + 0.3);
+    P.rect(x, xe, h0 + 0.08, h0 + 0.22, c);
+    P.board(x, xe, h0, h0 + 0.16, { ellipse: true, bg: c });
+  }
+  P.rect(x0, x1, h0 + 0.2, h0 + 0.22, 'rgba(0,0,0,0.12)');
+}
+
+/** Edelstahlgeländer vor einer Terrasse. */
+function railing(P, x0, x1, h0, h1) {
+  const c = '#aeb3b8', n = Math.max(1, Math.round((x1 - x0) / 1.6));
+  P.rect(x0, x1, h1 - 0.04, h1, c);
+  P.rect(x0, x1, (h0 + h1) / 2 - 0.015, (h0 + h1) / 2 + 0.015, c);
+  for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; P.rect(x - 0.025, x + 0.025, h0, h1, c); }
+}
 
 /**
  * Zeichenhilfe für eine Ladenfront. Koordinaten in Metern: x von links nach rechts (von der Straße aus

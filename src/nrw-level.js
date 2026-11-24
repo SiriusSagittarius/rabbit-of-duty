@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { pointInPoly, closestOnPoly } from './poly2d.js';
-import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=5';
+import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=10';
+import { buildMuchLandmarks, muchWallTextures } from './much-landmarks.js?v=1';
 
 /**
  * NRW-Geobasisdaten → echte Kulisse (Daten aus tools/nrw_fetch.py, Ordner assets/nrw/<ort>/):
@@ -41,7 +42,13 @@ const WALL_LAYERS = [
   'slate_shop',      // 8 (neutraler Schiefer mit Ladenlokal im EG)
   'shop_sparkasse',  // 9 (Kreissparkasse, Dr.-Wirtz-Str. 4)
   'brick',           // 10 (Klinker, z. B. Hauptstraße 24)
+  'bank_eg',         // 11 (VR-Bank: Glas-Erdgeschoss mit Blende, 3,6-m-Geschosse)
+  'bank_og',         // 12 (VR-Bank: Obergeschoss mit mintgrünen Paneelen – nur über bank_eg erreichbar)
 ];
+const L_CHURCH = WALL_LAYERS.indexOf('church'), L_BANK = WALL_LAYERS.indexOf('bank_eg'), L_BANK_OG = WALL_LAYERS.indexOf('bank_og');
+/** Geschosshöhe (Texturhöhe) und Achsbreite je Fassadenebene in Metern. */
+const storeyOf = (layer) => (layer === L_CHURCH ? 8.0 : layer === L_BANK ? 3.6 : 2.9);
+const bayOf = (layer) => (layer === 9 ? 5.5 : layer === L_CHURCH ? 4.0 : 3.0);
 // Ebenen 7–9 haben ein Ladenlokal im EG (der Shader teilt EG / Obergeschosse), 9 im breiten 5,5-m-Raster.
 // Die echten Läden der Hauptstraße bekommen stattdessen eine eigene Ladenfront (src/much-shops.js).
 const ROOF_LAYER = WALL_LAYERS.length;     // Ebene >= ROOF_LAYER = Dach: Farbe aus dem Luftbild
@@ -122,6 +129,13 @@ function buildingMaterial(arr, dop) {
         '    float upperU = (vLayer >= 8.5) ? fract(vMapUv.x * (5.5 / 3.0)) : fract(vMapUv.x);',
         '    wallTexel = texture( wallArray, vec3( upperU, fract(vMapUv.y), upperLayer ) );',
         '  }',
+        `} else if (abs(vLayer - ${L_CHURCH}.0) < 0.5) {`,
+        '  // Kirche: eine Kachel = 4 m × 8 m ab Sockel, darüber glatter Putz (oberste Zeile)',
+        `  wallTexel = texture( wallArray, vec3( vMapUv.x, clamp(vMapUv.y, 0.004, 0.996), ${L_CHURCH}.0 ) );`,
+        `} else if (abs(vLayer - ${L_BANK}.0) < 0.5) {`,
+        '  // Bank: unterstes Geschoss ab Straßenniveau = Glas-Erdgeschoss, alle anderen = Obergeschoss',
+        '  bool eg = vMapUv.y >= 0.0 && vMapUv.y < 1.0;',
+        `  wallTexel = texture( wallArray, vec3( vMapUv.x, eg ? clamp(vMapUv.y, 0.0, 0.999) : fract(vMapUv.y), eg ? ${L_BANK}.0 : ${L_BANK_OG}.0 ) );`,
         '} else {',
         `  wallTexel = texture( wallArray, vec3( vMapUv, min( vLayer, ${ROOF_LAYER - 1}.0 ) ) );`,
         '}',
@@ -210,15 +224,13 @@ function bakeParts(parts) {
  * Die Läden der Hauptstraße mit eigener Ladenfront stehen in src/much-shops.js.
  */
 export const MUCH_BY_ADDRESS = {
-  // St. Martinus Kirche: Altrosa/Terrakotta, romanische Rundbogenfenster, Turmuhr
+  // St. Martinus Kirche: Altrosa, romanische Rundbogenfenster (der Turm kommt aus src/much-landmarks.js)
   'Kirchplatz 1': { style: 'church', name: 'St. Martinus' },
 
   // Kreissparkasse
   'Dr.Wirtz-Straße 4': { style: 'shop_sparkasse', name: 'Kreissparkasse' },
   'Dr. Wirtz-Straße 4': { style: 'shop_sparkasse', name: 'Kreissparkasse' },
 
-  // dunkles Schieferhaus mit Restaurant im Erdgeschoss
-  'Hauptstraße 14': { style: 'slate_shop', name: 'Restaurant' },
 };
 
 /** ALKIS-Gebäudefunktion (LoD2 "function") + Adress-Matching → Fassadentyp. */
@@ -329,11 +341,10 @@ function addWall(buf, hull, p, y0, tint, layer, flip) {
     if (us[i] < umin) umin = us[i]; if (us[i] > umax) umax = us[i];
   }
   const W = umax - umin;
-  // Sparkasse: breiteres Raster (5,5 m), damit Schild und Front auf der Wand natürlich sitzen
-  const bayW = layer === 9 ? 5.5 : 3.0;
-  const bays = Math.max(1, Math.round(W / bayW));
+  // Sparkasse: breiteres Raster (5,5 m), damit Schild und Front auf der Wand natürlich sitzen; Kirche 4 m × 8 m
+  const bays = Math.max(1, Math.round(W / bayOf(layer))), storey = storeyOf(layer);
   const uvOf = (i) => [W >= 2.2 ? (us[i] - umin) / W * bays : 0.02 + (us[i] - umin) / Math.max(W, 0.01) * 0.06,
-    (p[i * 3 + 1] - y0) / 2.9];
+    (p[i * 3 + 1] - y0) / storey];
   for (const f of triangulate3D(p, nrm)) {
     buf.tri(vtx(p, f[0]), vtx(p, f[1]), vtx(p, f[2]), uvOf(f[0]), uvOf(f[1]), uvOf(f[2]), tint, nrm, layer);
     for (const k of f) hull.push(p[k * 3], p[k * 3 + 1], p[k * 3 + 2]);
@@ -394,8 +405,11 @@ const FACE_DIR = { N: [0, -1], S: [0, 1], O: [1, 0], E: [1, 0], W: [-1, 0] };   
  * u0..u1 = Ausdehnung entlang r, off = Lage der Wandebene entlang n, eave = Traufhöhe der Front.
  * Optionen (aus dem Ladeneintrag): face = Himmelsrichtung statt Straße (z. B. Laden im Giebel zum Platz),
  * near = [x, z] in Spielkoordinaten, bevorzugt die Wand nahe diesem Punkt (Häuser mit mehreren Straßenwänden).
+ * jog = größter Vor- oder Rücksprung (m), bis zu dem anschließende Wandstücke zur Front gehören (Standard 0,6);
+ * die Front steht vor dem vordersten Stück, Seitenteile schließen die Lücke.
  */
 function streetFront(b, roads, opt = {}) {
+  const jog = opt.jog ?? 0.6;
   const walls = [];
   for (const p of b.w) {
     const nrm = newell(p);
@@ -440,7 +454,7 @@ function streetFront(b, roads, opt = {}) {
     if (s > bestS) { bestS = s; best = w; }
   }
   if (!best) return null;
-  // Anschließende Stücke derselben Front dazunehmen (auch mit kleinem Vor- oder Rücksprung bis 0,6 m) –
+  // Anschließende Stücke derselben Front dazunehmen (auch mit kleinem Vor- oder Rücksprung bis jog) –
   // gemessen in der Basis der besten Wand: die eigenen Normalen weichen leicht ab, das verfälscht Abstände.
   const F = { nx: best.nx, nz: best.nz, rx: best.rx, rz: best.rz, u0: best.u0, u1: best.u1, off: best.off, eave: best.eave,
     parts: [{ u0: best.u0, u1: best.u1, off: best.off }] };
@@ -449,7 +463,7 @@ function streetFront(b, roads, opt = {}) {
     for (const w of walls) {
       if (w.nx * F.nx + w.nz * F.nz < 0.985) continue;
       const off = w.cx * F.nx + w.cz * F.nz;
-      if (Math.abs(off - best.off) > 0.6) continue;
+      if (Math.abs(off - best.off) > jog) continue;
       const ua = w.ax * F.rx + w.az * F.rz, ub = w.bx * F.rx + w.bz * F.rz;
       const wu0 = Math.min(ua, ub), wu1 = Math.max(ua, ub);
       if (wu1 < F.u0 - 0.5 || wu0 > F.u1 + 0.5 || (wu0 >= F.u0 - 0.01 && wu1 <= F.u1 + 0.01)) continue;
@@ -464,7 +478,7 @@ function streetFront(b, roads, opt = {}) {
   // Alle Wandflächen dieser Ebene samt Giebeldreiecken als Umrisse [u, y, …] – für Fronten über die ganze Wand (full)
   F.polys = [];
   for (const w of walls) {
-    if (w.nx * F.nx + w.nz * F.nz < 0.985 || Math.abs(w.cx * F.nx + w.cz * F.nz - best.off) > 0.6) continue;
+    if (w.nx * F.nx + w.nz * F.nz < 0.985 || Math.abs(w.cx * F.nx + w.cz * F.nz - best.off) > jog) continue;
     const ua = w.ax * F.rx + w.az * F.rz, ub = w.bx * F.rx + w.bz * F.rz;
     if (Math.max(ua, ub) < F.u0 - 0.05 || Math.min(ua, ub) > F.u1 + 0.05) continue;
     const q = [];
@@ -492,6 +506,38 @@ function streetLevel(F, H, y0) {
   hs.sort((p, q) => p - q);
   const base = Math.max(y0, hs[3]);
   return { base, bottom: Math.min(base, Math.max(y0, hs[0] - 0.25)) };
+}
+
+/**
+ * Foto-Mesh laden (assets/nrw/<ort>/mesh/, gebaut mit tools/nrw_mesh_fetch.py): je Kachel Uint16-Ecken (x y z u v,
+ * auf lo + ext quantisiert, Dreiecksliste) und ein JPG. Unbeleuchtet wie ein Foto. null, wenn nicht vorhanden.
+ */
+async function loadPhotoMesh(dir) {
+  let info;
+  try { info = await fetch(dir + 'mesh.json').then(r => (r.ok ? r.json() : null)); } catch { info = null; }
+  if (!info) return null;
+  const loader = new THREE.TextureLoader();
+  const group = new THREE.Group(); group.name = 'photoMesh';
+  await Promise.all(info.tiles.map(async (t) => {
+    const [buf, tex] = await Promise.all([
+      fetch(dir + t.file + '.bin').then(r => r.arrayBuffer()),
+      loader.loadAsync(dir + t.file + '.jpg'),
+    ]);
+    const q = new Uint16Array(buf), n = t.count, pos = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < 3; k++) pos[i * 3 + k] = t.lo[k] + q[i * 5 + k] / 65535 * t.ext[k];
+      uv[i * 2] = q[i * 5 + 3] / 65535; uv[i * 2 + 1] = q[i * 5 + 4] / 65535;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.computeBoundingSphere();
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.flipY = false;
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    m.userData.dispose = () => { g.dispose(); tex.dispose(); m.material.dispose(); };
+    group.add(m);
+  }));
+  return { group, half: [480, 290] };
 }
 
 /** Alle Ladenfronten (Much) als ein Mesh, Bilder in einem Atlas → ein Draw-Call. Atlas und Material bleiben im Cache. */
@@ -736,7 +782,8 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
   };
 
   // ---------- Gebäude (LoD2) ----------
-  D.mat.wallArray ||= wallArrayTexture(M.T);
+  // Kirchenschiff und Bank: eigene Ebenen aus src/much-landmarks.js (die Kirchen-Ebene gilt für alle NRW-Orte)
+  D.mat.wallArray ||= wallArrayTexture({ ...M.T, ...muchWallTextures() });
   D.mat.bNear ||= buildingMaterial(D.mat.wallArray, D.tex.near);
   D.mat.bFar ||= buildingMaterial(D.mat.wallArray, D.tex.far);
   const buildingRings = [];
@@ -897,9 +944,37 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
     tl.buf = null;                                    // Rohdaten freigeben
   }
   // ---------- Ladenfronten (Much): ein zusätzlicher Draw-Call ----------
-  {
-    const m = shopFrontMesh(D, shopFronts);
-    if (m) mapGroup.add(m);
+  const shopMesh = shopFrontMesh(D, shopFronts);
+  if (shopMesh) mapGroup.add(shopMesh);
+  // ---------- Wahrzeichen in Much (Kirchturm, Kugelbrunnen): ein Draw-Call ----------
+  let landmarks = null;
+  if (meta.name === 'much') {
+    landmarks = buildMuchLandmarks(H, D.mat.hull);
+    mapGroup.add(landmarks.mesh);
+    worldColliders.push(landmarks.hull); disposables.push(landmarks.hull.geometry);
+    for (const o of landmarks.obstacles) {
+      const ring = U.signedArea(o.poly) > 0 ? U.reverseRing(o.poly) : o.poly;
+      obstacles.push({ ...o, poly: ring });
+    }
+    tallBuildings.push(landmarks.tall);
+  }
+
+  // ---------- Foto-Mesh von Geobasis NRW (tools/nrw_mesh_fetch.py), Probe: localStorage rod.mesh = '1' ----------
+  // Ersetzt nur das Bild – Gelände-Höhen, Häuser-Kollision und Treffer bleiben die bisherigen Daten.
+  if (localStorage.getItem('rod.mesh') === '1') {
+    const pm = await loadPhotoMesh(loc.nrw + 'mesh/');
+    if (!isActive()) return null;
+    if (pm) {
+      mapGroup.add(pm.group);
+      const [ex, ez] = pm.half;
+      for (const c of chunks) {                     // Geländekacheln ganz im Mesh ausblenden, Randkacheln absenken
+        const inside = Math.abs(c.cx) + CHUNK / 2 < ex && Math.abs(c.cz) + CHUNK / 2 < ez;
+        if (inside) c.m.visible = false; else c.m.position.y = -0.5;
+      }
+      for (const o of mapGroup.children) {           // gebaute Häuser, Bäume und Ladenfronten zeigt jetzt das Foto
+        if (o.isMesh && (o.material === D.mat.bNear || o.material === D.mat.bFar || o.material === D.mat.trees || o === shopMesh || o === landmarks?.mesh)) o.visible = false;
+      }
+    }
   }
 
   // ---------- Bauzaun als Spielgrenze (folgt dem Gelände) ----------
