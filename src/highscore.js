@@ -31,8 +31,11 @@ export function submitScore(entry) {
   return call('/highscores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) });
 }
 
-/** Liste in ein <ol> schreiben. Namen nur als Text (nie als HTML). `mark` = Platz, der hervorgehoben wird. */
-export function renderTop(ol, top, mark = null) {
+/**
+ * Liste in ein <ol> schreiben. Namen nur als Text (nie als HTML). `mark` = Platz, der hervorgehoben wird.
+ * mode 'explore': im Feld wave stehen die entdeckten Orte.
+ */
+export function renderTop(ol, top, mark = null, mode = '') {
   ol.replaceChildren(...top.map((e, i) => {
     const li = document.createElement('li');
     if (mark === i + 1) li.className = 'me';
@@ -40,7 +43,8 @@ export function renderTop(ol, top, mark = null) {
     const name = document.createElement('span'); name.className = 'n'; name.textContent = e.name;
     const pts = document.createElement('span'); pts.className = 's'; pts.textContent = e.score.toLocaleString('de-DE');
     const info = document.createElement('span'); info.className = 'i';
-    info.textContent = [e.wave ? 'Welle ' + e.wave : '', e.kills ? e.kills + ' Kills' : ''].filter(Boolean).join(' · ');
+    info.textContent = mode === 'explore' ? (e.wave ? e.wave + (e.wave === 1 ? ' Ort' : ' Orte') : '')
+      : [e.wave ? 'Welle ' + e.wave : '', e.kills ? e.kills + ' Kills' : ''].filter(Boolean).join(' · ');
     li.append(rank, name, pts, info);
     return li;
   }));

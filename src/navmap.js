@@ -8,12 +8,21 @@ import { pointInPoly, closestOnPoly } from './poly2d.js';
  *  - Route per A* auf einem Raster über die Spielfläche: um Häuser/Hindernisse herum, Straßen bevorzugt
  *  - Führung im Spiel: leuchtende Pfeillinie am Boden, Hinweis oben („In 40 m rechts abbiegen“),
  *    Route auf dem Radar, optional Navi-Stimme (Web Speech, deutsch)
+ *  - Erkundungsflug im Team: Liste der Mitflieger rechts in der Karte. Gewählter Mitflieger = Ziel, das mitwandert:
+ *    Luftroute geradeaus über die Dächer (Höhe aus ceilingAt), Leuchtband in der Luft knapp unter der Flughöhe,
+ *    Hinweis oben mit Abstand und Höhe. Der Autopilot (autopilot.js, main.js) fliegt diese Route.
  * Koordinaten: Welt x = Osten, Welt z = Süden (Norden = −z, also oben auf der Karte).
  */
 const _cp = { x: 0, z: 0, d2: 0 };
 const PLAYER_R = 0.45;            // Platzbedarf beim Rastern der Hindernisse
 const ROAD_COST = 0.5, OFF_COST = 1.4;      // abseits der Wege fast 3× teurer → Route folgt Straßen und Fußwegen
 const ARRIVE = 4, OFFROUTE = 7;   // m
+// Luftroute zum Mitflieger: Abtastung, Abstand über Dächern und Bäumen, Vorlauf zum rechtzeitigen Steigen, höchste Steigung
+const AIR_STEP = 4, AIR_CLEAR = 6, AIR_WIN = 16, AIR_SLOPE = 0.7;
+const AIR_RIBBON_DROP = 2.2, AIR_RIBBON_W = 0.8;   // Leuchtband so weit unter der Augenhöhe, halbe Breite
+const FRIEND_NEAR = 15;           // m: angekommen
+const FRIEND_PICK_PX = 16;        // Klick so nah am Punkt eines Mitfliegers wählt ihn
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export class NavMap {
   /**
@@ -24,6 +33,10 @@ export class NavMap {
    * @param {(x:number,z:number)=>number} o.groundAt
    * @param {() => object[]} o.getEnemies
    * @param {(t:string)=>void} o.banner
+   * @param {() => (object[]|null)} [o.getFriends]   Mitflieger [{id, name, x, y, z, ry}] (y = Augenhöhe); null = kein Erkundungsflug
+   * @param {(x:number,z:number)=>number} [o.ceilingAt]  höchster Punkt (Gelände, Dach, Baum) um x/z
+   * @param {() => boolean} [o.isAutopilot]
+   * @param {boolean} [o.touch]       Handy: keine Tastenhinweise
    */
   constructor(o) {
     Object.assign(this, o);
@@ -31,6 +44,8 @@ export class NavMap {
     this.layers = []; this.roads = [];
     this.grid = null; this.gridDirty = true;
     this.marker = null; this.route = null; this.rerouteT = 0;
+    this.friend = null; this.air = null; this.airT = 0;     // Mitflieger als Ziel, Luftroute dorthin
+    this._lastPos3 = { x: 0, y: 0, z: 0 }; this._friendDots = []; this._panelSig = ''; this._panelT = 0;
     this.voice = localStorage.getItem('rod.navVoice') !== '0';
     this.view = { x: 0, z: 0, s: 2 };      // Kartenmitte (Welt) und Maßstab (Pixel pro Meter, CSS)
     this._buildDom();
@@ -41,6 +56,7 @@ export class NavMap {
   reset() {
     this.layers = []; this.roads = [];
     this.gridDirty = true;
+    this.clearFriend(true);
     this.clearMarker(true);
   }
   setLevel({ layers = [], roads = [] } = {}) {
@@ -168,6 +184,7 @@ export class NavMap {
   // ------------------------------------------------------------------ Ziel & Route
   setMarker(x, z, from) {
     const B = this.getBounds(), mx = B.x - 1.5, mz = B.z - 1.5;
+    this.clearFriend(true);                             // ein Ziel zur Zeit
     this.marker = { x: Math.max(-mx, Math.min(mx, x)), z: Math.max(-mz, Math.min(mz, z)) };
     this._route(from);
     if (this.route) this._say(`Route berechnet. ${this._fmt(this.route.len)} bis zum Ziel.`);
@@ -193,6 +210,121 @@ export class NavMap {
     this.route = { path, cum, len: cum[cum.length - 1], turns, prog: 0, seg: 0 };
     this._buildRibbonGeometry();
   }
+  /** Alles löschen (Knopf „Ziel löschen“, Rechtsklick, Entf): Kartenziel und Mitflieger. */
+  clearAll() {
+    const had = !!(this.marker || this.friend);
+    this.clearFriend(true); this.clearMarker(true);
+    if (had) this._say('Navigation beendet.');
+  }
+  say(text) { this._say(text); }
+
+  // ------------------------------------------------------------------ Mitflieger als Ziel (Erkundungsflug im Team)
+  friends() { return this.getFriends ? this.getFriends() : null; }
+  friendById(id) { return (this.friends() || []).find((f) => f.id === id) || null; }
+  /** Weg zum Mitflieger zeigen. from: eigene Position (mit Höhe). */
+  setFriend(id, from) {
+    const f = this.friendById(id);
+    if (!f) return false;
+    this.clearMarker(true);
+    this.friend = { id, name: f.name, arrived: false, dist: Infinity };
+    this.airT = 0.4; this._airRoute(from, f);
+    this._say(`Route zu ${f.name}.`);
+    return true;
+  }
+  /** Mitflieger Nummer i (0 = erster in der Liste) wählen. */
+  pickFriend(i, from) { const f = (this.friends() || [])[i]; return f ? this.setFriend(f.id, from) : false; }
+  clearFriend(silent) {
+    if (!this.friend) return;
+    this.friend = null; this.air = null;
+    this.ribbon.visible = false; this.hud.style.display = 'none';
+    if (!silent) this._say('Navigation beendet.');
+  }
+  /**
+   * Luftroute geradeaus zum Mitflieger: alle AIR_STEP m die Höhe von Gelände, Dächern und Bäumen, rechtzeitig darüber
+   * steigen (Vorlauf AIR_WIN) und höchstens mit AIR_SLOPE steigen bzw. sinken. Anfang bei mir, Ende bei ihm.
+   */
+  _airRoute(from, to) {
+    const dx = to.x - from.x, dz = to.z - from.z, L = Math.hypot(dx, dz);
+    const n = Math.max(1, Math.ceil(L / AIR_STEP)), step = L / n;
+    const top = new Float32Array(n + 1), ys = new Float32Array(n + 1);
+    for (let i = 0; i <= n; i++) {
+      const x = from.x + dx * i / n, z = from.z + dz * i / n;
+      top[i] = this.ceilingAt ? this.ceilingAt(x, z) : this.groundAt(x, z);
+    }
+    const w = Math.max(1, Math.round(AIR_WIN / Math.max(step, 0.5)));
+    for (let i = 0; i <= n; i++) {
+      let m = -Infinity;
+      for (let j = Math.max(0, i - w); j <= Math.min(n, i + w); j++) m = Math.max(m, top[j]);
+      ys[i] = Math.max(from.y + (to.y - from.y) * i / n, m + AIR_CLEAR);
+    }
+    for (let i = n - 1; i >= 1; i--) ys[i] = Math.max(ys[i], ys[i + 1] - step * AIR_SLOPE);
+    for (let i = 1; i < n; i++) ys[i] = Math.max(ys[i], ys[i - 1] - step * AIR_SLOPE);
+    ys[0] = from.y; ys[n] = to.y;
+    const path = [], cum = [];
+    for (let i = 0; i <= n; i++) { path.push({ x: from.x + dx * i / n, y: ys[i], z: from.z + dz * i / n }); cum.push(step * i); }
+    this.air = { path, cum, len: L, prog: 0, seg: 0, step: Math.max(step, 1e-3) };
+    this._ribbon3(path.map((p, i) => ({ x: p.x, y: p.y - AIR_RIBBON_DROP, z: p.z, d: cum[i] })), AIR_RIBBON_W, 3.2);
+    this.ribbonStep = this.air.step;
+  }
+  /** Punkt L m voraus auf der Luftroute (ab dem eigenen Fortschritt) in out (THREE.Vector3); null ohne Route. */
+  airAhead(L, out) {
+    const A = this.air;
+    if (!A) return null;
+    const P = A.path, d = Math.min(A.len, A.prog + L);
+    let i = Math.max(0, Math.min(P.length - 2, A.seg));
+    while (i < P.length - 2 && A.cum[i + 1] < d) i++;
+    const t = clamp((d - A.cum[i]) / (A.cum[i + 1] - A.cum[i] || 1e-6), 0, 1);
+    return out.set(P[i].x + (P[i + 1].x - P[i].x) * t, P[i].y + (P[i + 1].y - P[i].y) * t, P[i].z + (P[i + 1].z - P[i].z) * t);
+  }
+  _updateFriend(dt, pos, yaw) {
+    const F = this.friend, f = this.friendById(F.id);
+    if (!f) {
+      this.banner(`${F.name.toUpperCase()} IST NICHT MEHR IM TEAM`);
+      this._say(`${F.name} ist nicht mehr im Team.`);
+      this.clearFriend(true);
+      return;
+    }
+    F.name = f.name;
+    const dist = Math.hypot(f.x - pos.x, f.y - pos.y, f.z - pos.z), auto = !!this.isAutopilot?.();
+    F.dist = dist;
+    if (dist < FRIEND_NEAR) {
+      if (!F.arrived) {
+        F.arrived = true;
+        this.banner(`BEI ${f.name.toUpperCase()}`);
+        this._say(auto ? `Du bist bei ${f.name}. Der Autopilot fliegt mit.` : `Du bist bei ${f.name}.`);
+      }
+      if (!auto) { this.clearFriend(true); return; }       // ohne Autopilot ist die Führung hier fertig
+    } else if (dist > FRIEND_NEAR * 2.5) F.arrived = false;
+    this.airT -= dt;
+    if (this.airT <= 0 || !this.air) { this.airT = 0.4; this._airRoute(pos, f); }
+    // Fortschritt (waagerecht): nächster Punkt auf der Route
+    const A = this.air, P = A.path;
+    let best = Infinity, bestSeg = 0, bestT = 0;
+    for (let i = Math.max(0, A.seg - 3); i < Math.min(P.length - 1, A.seg + 12); i++) {
+      const ax = P[i].x, az = P[i].z, sx = P[i + 1].x - ax, sz = P[i + 1].z - az, L2 = sx * sx + sz * sz || 1e-6;
+      const t = clamp(((pos.x - ax) * sx + (pos.z - az) * sz) / L2, 0, 1);
+      const d = Math.hypot(pos.x - (ax + sx * t), pos.z - (az + sz * t));
+      if (d < best) { best = d; bestSeg = i; bestT = t; }
+    }
+    A.seg = bestSeg; A.prog = A.cum[bestSeg] + bestT * (A.cum[bestSeg + 1] - A.cum[bestSeg]);
+    const q0 = Math.max(0, Math.floor(A.prog / A.step) - 1);
+    this.ribbon.visible = dist > FRIEND_NEAR;
+    this.ribbon.geometry.setDrawRange(q0 * 6, Math.max(0, this.ribbonQuads - q0) * 6);
+    // Hinweis oben: Richtung zu einem Punkt voraus auf der Route, Abstand und Höhe
+    const ap = this.airAhead(12, this._v3 || (this._v3 = new THREE.Vector3()));
+    const dx = ap.x - pos.x, dz = ap.z - pos.z;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    this.hudArrow.style.transform = `rotate(${Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz) - Math.PI / 2}rad)`;
+    const dy = f.y - pos.y;
+    this.hudText.textContent = auto ? `🤖 Autopilot · ${f.name}` : `🧭 Zu ${f.name}`;
+    let sub = this._fmt(dist);
+    if (dy > 6) sub += ` · ▲ ${Math.round(dy)} m höher`; else if (dy < -6) sub += ` · ▼ ${Math.round(-dy)} m tiefer`;
+    if (auto && F.arrived) sub += ' · Begleitflug';
+    if (!this.touch) sub += auto ? ' · P: aus' : ' · P: Autopilot';
+    this.hudDist.textContent = sub;
+    this.hud.style.display = 'flex';
+  }
+
   _fmt(m) { return m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : (m < 20 ? Math.round(m) : Math.round(m / 10) * 10) + ' m'; }
   _say(text) {
     if (!this.voice || !('speechSynthesis' in window)) return;
@@ -208,6 +340,7 @@ export class NavMap {
   // ------------------------------------------------------------------ Führung im Spiel (jedes Bild)
   update(dt, pos, yaw) {
     this.ribbonMat.map.offset.x -= dt * 0.9;            // Pfeile laufen in Fahrtrichtung
+    if (this.friend) { this._updateFriend(dt, pos, yaw); return; }
     const R = this.route;
     if (!R) return;
     // Fortschritt: nächster Punkt auf der Route (Suche um das letzte Segment)
@@ -280,17 +413,23 @@ export class NavMap {
     this.ribbonStep = 1; this.ribbonQuads = 0;
   }
   _buildRibbonGeometry() {
-    const R = this.route, step = this.ribbonStep, W = 0.38;
+    const R = this.route;
+    this.ribbonStep = 1;
     const pts = [];
-    for (let d = 0; d <= R.len; d += step) pts.push(this._pointAlong(d));
+    for (let d = 0; d <= R.len; d += this.ribbonStep) pts.push(this._pointAlong(d));
     pts.push(R.path[R.path.length - 1]);
-    const n = pts.length, pos = new Float32Array(n * 2 * 3), uv = new Float32Array(n * 2 * 2), idx = [];
+    this._ribbon3(pts.map((p, i) => ({ x: p.x, y: this.groundAt(p.x, p.z) + 0.16, z: p.z, d: Math.min(R.len, i * this.ribbonStep) })), 0.38, 1.6);
+  }
+  /** Leuchtband aus Punkten [{x, y, z, d}] (d = Strecke ab Start), halbe Breite W, alle rep m ein Pfeil. */
+  _ribbon3(pts, W, rep) {
+    const n = pts.length;
+    if (n < 2) { this.ribbon.visible = false; this.ribbonQuads = 0; return; }
+    const pos = new Float32Array(n * 2 * 3), uv = new Float32Array(n * 2 * 2), idx = [];
     for (let i = 0; i < n; i++) {
-      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], p = pts[i];
       let dx = b.x - a.x, dz = b.z - a.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
-      const y = this.groundAt(pts[i].x, pts[i].z) + 0.16, d = Math.min(R.len, i * step);
-      pos.set([pts[i].x - dz * W, y, pts[i].z + dx * W, pts[i].x + dz * W, y, pts[i].z - dx * W], i * 6);
-      uv.set([d / 1.6, 0, d / 1.6, 1], i * 4);
+      pos.set([p.x - dz * W, p.y, p.z + dx * W, p.x + dz * W, p.y, p.z - dx * W], i * 6);
+      uv.set([p.d / rep, 0, p.d / rep, 1], i * 4);
       if (i < n - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
     }
     const g = new THREE.BufferGeometry();
@@ -312,6 +451,20 @@ export class NavMap {
   // ------------------------------------------------------------------ Radar
   /** Route + Ziel ins Radar zeichnen. project(dx,dz) → {x,y} in Radar-Pixeln (gleiche Drehung wie die Gegnerpunkte). */
   drawRadar(ctx, pos, project, cx, cy, maxR) {
+    if (this.friend) {                                  // Mitflieger: gestrichelte Linie zu ihm, roter Ring um seinen Punkt
+      const f = this.friendById(this.friend.id);
+      if (!f) return;
+      let m = project(f.x - pos.x, f.z - pos.z);
+      const d = Math.hypot(m.x - cx, m.y - cy);
+      if (d > maxR) m = { x: cx + (m.x - cx) / d * maxR, y: cy + (m.y - cy) / d * maxR };
+      ctx.save();
+      ctx.strokeStyle = 'rgba(60,242,255,0.9)'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(m.x, m.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.strokeStyle = '#ff3b6b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(m.x, m.y, 8, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      return;
+    }
     if (!this.marker) return;
     if (this.route) {
       ctx.save();
@@ -341,6 +494,7 @@ export class NavMap {
       <canvas id="navMapCanvas"></canvas>
       <div class="nm-top"><b>KARTE</b><span id="nmInfo"></span>
         <button id="nmVoice" type="button"></button><button id="nmClear" type="button">Ziel löschen</button><button id="nmClose" type="button">Schließen (N)</button></div>
+      <div id="nmFriends"></div>
       <div class="nm-help">Mausrad: Zoom · Ziehen: Verschieben · Klick: Ziel setzen · Rechtsklick: Ziel löschen · Leertaste: auf mich zentrieren · N / Tab: zurück ins Spiel · Esc: Pause</div>`;
     document.body.appendChild(root);
     const hud = document.createElement('div');
@@ -350,12 +504,26 @@ export class NavMap {
     this.root = root; this.canvas = root.querySelector('canvas'); this.ctx = this.canvas.getContext('2d');
     this.hud = hud; this.hudArrow = hud.querySelector('.nh-arrow'); this.hudText = hud.querySelector('.nh-text'); this.hudDist = hud.querySelector('.nh-dist');
     this.info = root.querySelector('#nmInfo');
+    this.helpEl = root.querySelector('.nm-help'); this.helpText = this.helpEl.textContent;
+    // Mitflieger-Liste: Weg zeigen oder Autopilot (Knöpfe in der Zeile)
+    this.friendsEl = root.querySelector('#nmFriends');
+    for (const ev of ['mousedown', 'mouseup', 'wheel', 'contextmenu']) this.friendsEl.addEventListener(ev, (e) => e.stopPropagation());
+    this.friendsEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const btn = e.target.closest('button'), row = e.target.closest('[data-id]');
+      if (!btn || !row || this._ghost()) return;
+      const id = row.dataset.id;
+      if (btn.dataset.act === 'auto') this.onAutopilot?.(id);
+      else if (this.friend?.id === id) this.clearAll();
+      else this.setFriend(id, this._lastPos3);
+      this._panelSig = '';
+    });
     const vb = root.querySelector('#nmVoice');
     const syncVoice = () => { vb.textContent = this.voice ? '🔊 Navi-Stimme: AN' : '🔇 Navi-Stimme: AUS'; };
     syncVoice();
-    vb.addEventListener('click', (e) => { e.stopPropagation(); this.voice = !this.voice; localStorage.setItem('rod.navVoice', this.voice ? '1' : '0'); syncVoice(); });
-    root.querySelector('#nmClear').addEventListener('click', (e) => { e.stopPropagation(); this.clearMarker(); });
-    root.querySelector('#nmClose').addEventListener('click', (e) => { e.stopPropagation(); this.onRequestClose?.('resume'); });
+    vb.addEventListener('click', (e) => { e.stopPropagation(); if (this._ghost()) return; this.voice = !this.voice; localStorage.setItem('rod.navVoice', this.voice ? '1' : '0'); syncVoice(); });
+    root.querySelector('#nmClear').addEventListener('click', (e) => { e.stopPropagation(); if (!this._ghost()) this.clearAll(); });
+    root.querySelector('#nmClose').addEventListener('click', (e) => { e.stopPropagation(); if (!this._ghost()) this.onRequestClose?.('resume'); });
     // Maus: Zoom um den Mauszeiger, Ziehen = verschieben, Klick = Ziel
     const cv = this.canvas;
     cv.addEventListener('wheel', (e) => {
@@ -376,21 +544,31 @@ export class NavMap {
     addEventListener('mouseup', (e) => {
       if (!drag || !this.isOpen) { drag = null; return; }
       const wasClick = !drag.moved; drag = null;
-      if (wasClick && e.target === cv) {
-        const r = cv.getBoundingClientRect(), w = this._toWorld(e.clientX - r.left, e.clientY - r.top);
+      if (wasClick && e.target === cv && !this._ghost()) {
+        const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+        const hit = this._friendDots.find((o) => Math.hypot(o.px - mx, o.py - my) < FRIEND_PICK_PX);
+        if (hit) { this.setFriend(hit.id, this._lastPos3); this._panelSig = ''; return; }   // Klick auf einen Mitflieger
+        const w = this._toWorld(mx, my);
         this.setMarker(w.x, w.z, this._lastPos || { x: 0, z: 0 });
       }
     });
-    cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (this.marker) this.clearMarker(); });
+    cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (this.marker || this.friend) this.clearAll(); });
   }
+  /** Klick kurz nach dem Öffnen: der nachgeschickte Klick des Antippens (Handy-Knopf „Navi“) – nicht auswerten. */
+  _ghost() { return performance.now() - (this._openedAt || 0) < 450; }
   _minScale() { const r = this.canvas.getBoundingClientRect(), B = this.getBounds(); return Math.min(r.width / (2 * (B.x + 60)), r.height / (2 * (B.z + 60))); }
   _toWorld(mx, my) {
     const r = this.canvas.getBoundingClientRect();
     return { x: this.view.x + (mx - r.width / 2) / this.view.s, z: this.view.z + (my - r.height / 2) / this.view.s };
   }
   open(pos) {
-    this.isOpen = true; this.root.style.display = 'block';
+    this.isOpen = true; this.root.style.display = 'block'; this._openedAt = performance.now();
     this._lastPos = { x: pos.x, z: pos.z };
+    this._lastPos3 = { x: pos.x, y: pos.y, z: pos.z };
+    const fr = this.friends();
+    this.helpEl.textContent = fr ? (this.touch ? 'Tippe bei einem Mitflieger auf „Weg“ oder „Autopilot“'
+      : `${this.helpText.replace(' · Esc: Pause', '')} · 1–9: Mitflieger · P: Autopilot`) : this.helpText;
+    this._panelSig = '';
     const r = this.canvas.getBoundingClientRect();
     if (!this._viewInit) {                               // beim ersten Öffnen: ~240 m Ausschnitt um den Spieler
       const B = this.getBounds();
@@ -405,6 +583,7 @@ export class NavMap {
 
   draw(pos, yaw) {
     this._lastPos = { x: pos.x, z: pos.z };
+    this._lastPos3 = { x: pos.x, y: pos.y, z: pos.z };
     const cv = this.canvas, dpr = Math.min(window.devicePixelRatio || 1, 2);
     const W = cv.clientWidth, H = cv.clientHeight;
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -453,6 +632,32 @@ export class NavMap {
       if (e.dead) continue;
       g.fillStyle = '#ff3b3b'; g.beginPath(); g.arc(X(e.g.position.x), Y(e.g.position.z), 3.5, 0, Math.PI * 2); g.fill();
     }
+    // Mitflieger (Erkundungsflug im Team): Luftlinie zum gewählten, Punkte mit Nummer und Namen
+    const fr = this.friends();
+    this._friendDots = [];
+    if (fr) {
+      const sel = this.friend && fr.find((f) => f.id === this.friend.id);
+      if (sel) {
+        for (const [w, col] of [[7, 'rgba(0,20,30,0.75)'], [4, '#3cf2ff']]) {
+          g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.setLineDash(w === 4 ? [10, 6] : []);
+          g.beginPath(); g.moveTo(X(pos.x), Y(pos.z)); g.lineTo(X(sel.x), Y(sel.z)); g.stroke();
+        }
+        g.setLineDash([]);
+      }
+      g.font = '700 13px system-ui, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      fr.forEach((f, i) => {
+        const px = X(f.x), py = Y(f.z), on = sel && sel.id === f.id;
+        this._friendDots.push({ id: f.id, px, py });
+        if (on) { g.strokeStyle = '#ff3b6b'; g.lineWidth = 3; g.beginPath(); g.arc(px, py, 12, 0, Math.PI * 2); g.stroke(); }
+        g.fillStyle = '#5fd0ff'; g.strokeStyle = '#fff'; g.lineWidth = 2;
+        g.beginPath(); g.arc(px, py, 6.5, 0, Math.PI * 2); g.fill(); g.stroke();
+        const label = `${i < 9 ? i + 1 + ' ' : ''}${f.name}`;
+        g.lineWidth = 4; g.strokeStyle = 'rgba(4,10,14,0.9)'; g.strokeText(label, px + 12, py);
+        g.fillStyle = '#d6f2ff'; g.fillText(label, px + 12, py);
+      });
+      g.textBaseline = 'alphabetic';
+    }
+    this._syncFriendPanel(fr, pos);
     // Ziel-Nadel
     if (this.marker) {
       const mx = X(this.marker.x), my = Y(this.marker.z);
@@ -476,7 +681,49 @@ export class NavMap {
     g.save(); g.translate(W - 34, 70); g.fillStyle = 'rgba(8,14,20,0.8)'; g.beginPath(); g.arc(0, 0, 18, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#ff6b6b'; g.beginPath(); g.moveTo(0, -13); g.lineTo(6, 2); g.lineTo(-6, 2); g.closePath(); g.fill();
     g.fillStyle = '#e8eef5'; g.font = '700 11px system-ui, sans-serif'; g.textAlign = 'center'; g.fillText('N', 0, 14); g.restore();
-    this.info.textContent = this.route ? `Ziel: ${this._fmt(this.route.len - this.route.prog)} · ${this.route.turns.length} Abbiegungen`
+    this.info.textContent = this.friend ? `Ziel: ${this.friend.name}${this.friend.dist < Infinity ? ' · ' + this._fmt(this.friend.dist) : ''}`
+      : this.route ? `Ziel: ${this._fmt(this.route.len - this.route.prog)} · ${this.route.turns.length} Abbiegungen`
       : (this.marker ? 'Kein Weg gefunden' : 'Klick auf die Karte setzt ein Ziel');
+  }
+
+  /** Mitflieger-Liste rechts in der Karte (nur im Erkundungsflug). Neu aufbauen nur, wenn sich etwas geändert hat. */
+  _syncFriendPanel(fr, pos) {
+    const el = this.friendsEl;
+    el.style.display = fr ? 'block' : 'none';
+    if (!fr) return;
+    const auto = !!this.isAutopilot?.();
+    const sig = fr.map((f) => f.id + ':' + f.name).join('|') + '#' + (this.friend?.id || '') + (auto ? 'A' : '');
+    if (sig !== this._panelSig) {
+      this._panelSig = sig; this._panelT = 0;
+      el.replaceChildren();
+      const head = document.createElement('div'); head.className = 'nf-head'; head.textContent = 'MITFLIEGER';
+      el.append(head);
+      if (!fr.length) {
+        const e = document.createElement('div'); e.className = 'nf-empty';
+        e.textContent = 'Gerade fliegt niemand mit. Wenn ihr im Team fliegt (Startmenü → Erkundungsflug → Team), stehen deine Mitflieger hier.';
+        el.append(e);
+      }
+      fr.forEach((f, i) => {
+        const on = this.friend?.id === f.id;
+        const row = document.createElement('div'); row.className = 'nf-row' + (on ? ' sel' : ''); row.dataset.id = f.id;
+        const num = document.createElement('span'); num.className = 'nf-num'; num.textContent = i < 9 ? String(i + 1) : '·';
+        const name = document.createElement('span'); name.className = 'nf-name'; name.textContent = f.name;
+        const dist = document.createElement('span'); dist.className = 'nf-dist';
+        const b1 = document.createElement('button'); b1.type = 'button'; b1.dataset.act = 'route'; b1.textContent = on ? '✕ Weg' : '🧭 Weg';
+        const b2 = document.createElement('button'); b2.type = 'button'; b2.dataset.act = 'auto'; b2.className = 'nf-auto';
+        b2.textContent = on && auto ? '⏹ Autopilot aus' : '🤖 Autopilot';
+        row.append(num, name, dist, b1, b2);
+        el.append(row);
+      });
+    }
+    const now = performance.now();
+    if (now - this._panelT < 250) return;               // Abstände 4× pro Sekunde
+    this._panelT = now;
+    for (const row of el.querySelectorAll('.nf-row')) {
+      const f = fr.find((o) => o.id === row.dataset.id);
+      if (!f) continue;
+      const d = Math.hypot(f.x - pos.x, f.y - pos.y, f.z - pos.z), dy = f.y - pos.y;
+      row.querySelector('.nf-dist').textContent = this._fmt(d) + (dy > 8 ? ' ▲' : dy < -8 ? ' ▼' : '');
+    }
   }
 }

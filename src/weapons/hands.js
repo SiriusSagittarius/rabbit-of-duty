@@ -538,7 +538,7 @@ export class Arm {
      * always, exactly as they do on a real shooter.
      */
     this.pole = opts.pole
-      ? new THREE.Vector3().fromArray(opts.pole).normalize()   // Rabbit of Duty: je Arm einstellbar (viewmodel.js)
+      ? new THREE.Vector3().fromArray(opts.pole).normalize()   // Flying Much: je Arm einstellbar (viewmodel.js)
       : new THREE.Vector3(side * 0.46, -0.86, 0.22).normalize();
 
     // Bones. Geometry extends along -Z from each joint.
@@ -562,7 +562,7 @@ export class Arm {
      * carry the silhouette, and each one is a crease the mask bake fills with
      * grime and a crown it rubs dust onto.
      *
-     * Rabbit of Duty (22.11.2026): Die Breite ist jetzt über opts.sleeveScale einstellbar. In
+     * Flying Much (22.11.2026): Die Breite ist jetzt über opts.sleeveScale einstellbar. In
      * viewmodel.js steht sie auf 1,6, der Stützarm hat also 109/77 mm statt 68/48 mm. Zusammen mit
      * der neuen Griffhaltung (rifle.js gripL) kommt der Unterarm schräg von unten links ins Bild.
      * Dort wirkt ein kräftiger Ärmel wie ein Arm. Dünn wirkte er wie ein Stab quer durchs Bild.

@@ -417,7 +417,7 @@ export function buildRifle() {
        * this same cylinder at build time; see Arm.fitToCylinder.
        */
       /**
-       * Rabbit of Duty (22.11.2026): neue Haltung. Die Herleitungen oben gehören zur alten.
+       * Flying Much (22.11.2026): neue Haltung. Die Herleitungen oben gehören zur alten.
        *
        * Vorher lag das Handgelenk links neben dem Handschutz auf Laufhöhe. Die Finger zeigten
        * nach rechts, die Hand war also gegen den Unterarm um rund 90 Grad abgeknickt. Im Bild

@@ -1,5 +1,6 @@
 /**
  * Läden an der Hauptstraße in Much (und die VR-Bank am Kirchplatz) – gezeichnete Fassaden oder eigene Fotos.
+ * Die Wohnhäuser der Schulstraße stehen in much-houses.js und kommen über MUCH_HOUSES mit in diese Liste.
  *
  * Grundlage: Street-View-Screenshots, nur als Vorlage für Ladenfolge, Haustyp, Farben und Lage der
  * Schilder (nicht als Textur). Schilder sind einfache Schriftzüge in den Ladenfarben, keine nachgezeichneten Logos.
@@ -19,11 +20,16 @@
  *   photo optional: eigenes, entzerrtes Foto der ganzen Wand (assets/nrw/much/fronts/<photo>.webp, gebaut mit
  *         tools/rectify_fronts.py). Ist es da, ersetzt es draw() und bedeckt die ganze Wand; fehlt es, bleibt draw().
  *   photos optional: weitere Fotos, die draw() mit P.photo(name, x0, x1, h0, h1) einsetzt (z. B. ein Ladenschild)
+ *   street optional: Straße, zu der die Front zeigt (Standard: Straße der Hausadresse, sonst Hauptstraße)
+ *   raise optional: Haus um so viele Meter aufstocken (nach dem LoD2-Stand neu gebaut oder erhöht)
+ *   px    optional: Auflösung im Atlas (Pixel je Meter, Standard SHOP_PX = 64); schlichte Wohnhäuser mit 40 sparen Speicher
  *
  * nrw-level.js sucht je Laden die Wand, die zur Straße zeigt, setzt die Front auf das Straßenniveau davor,
  * richtet das Geschossraster des Hauses danach aus und packt alle Fronten in einen Texturatlas
  * (ein Mesh, ein Draw-Call). Eigene Fotos: siehe photo/photos oben – sie kommen in denselben Atlas.
  */
+
+import { MUCH_HOUSES } from './much-houses.js?v=4';
 
 export const SHOP_PX = 64;        // Pixel pro Meter im Atlas
 export const SHOP_TOP = 3.4;      // Höhe der Front über Straßenniveau: Erdgeschoss 2,9 m + Schildband
@@ -57,6 +63,7 @@ const SCRIPT = '"Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive
 const ROUND = '"Arial Rounded MT Bold", "Segoe UI", Arial, sans-serif';
 
 export const MUCH_SHOPS = {
+  ...MUCH_HOUSES,                 // Wohnhäuser an der Schulstraße (src/much-houses.js)
   // ---------- Nordseite (ungerade Hausnummern), von Osten nach Westen ----------
   'Hauptstraße 19': {
     name: 'Metzgerei Fedder', wall: 'fachwerk', tint: '#ffffff',
@@ -1282,7 +1289,7 @@ function brace(P, xa, ha, xb, hb, bw, col) {
  * gesehen), h = Höhe über Straßenniveau (0 = Gehweg, negativ = Sockel bis zur Unterkante).
  */
 function painter(g, W, top, plinth, seed, extra = {}) {
-  const px = SHOP_PX;
+  const px = extra.px || SHOP_PX;
   /** Oberkante der Wand bei x (nur bei Fronten über die ganze Wand, sonst top). */
   const roofAt = (x) => {
     let best = -Infinity;
@@ -1566,8 +1573,9 @@ export function drawShopAtlas(items) {
   const PAD = 6, AW = 2048;
   const imgs = items.map((it, i) => {
     const c = document.createElement('canvas');
-    c.width = Math.max(8, Math.min(AW - 2 * PAD, Math.round(it.width * SHOP_PX)));
-    c.height = Math.max(8, Math.round((it.top + it.plinth) * SHOP_PX));
+    const ppm = it.px || SHOP_PX;
+    c.width = Math.max(8, Math.min(AW - 2 * PAD, Math.round(it.width * ppm)));
+    c.height = Math.max(8, Math.round((it.top + it.plinth) * ppm));
     const g = c.getContext('2d');
     g.fillStyle = '#eeeeea'; g.fillRect(0, 0, c.width, c.height);
     try {

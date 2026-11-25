@@ -1,11 +1,13 @@
-# Rabbit of Duty 🐰
+# Flying Much 🧹
 
-Ein Ego-Shooter für den Browser, gebaut mit [Three.js](https://threejs.org/). Herzstück ist die Karte **Muchtown**,
-der Ortskern von Much im Bergischen Land: Das Dorf ist aus amtlichen offenen Geodaten nachgebaut, mit echtem Gelände,
+Ein Flugspiel für den Browser, gebaut mit [Three.js](https://threejs.org/). Auf dem Besen geht es über **Muchtown**,
+den Ortskern von Much im Bergischen Land: Das Dorf ist aus amtlichen offenen Geodaten nachgebaut, mit echtem Gelände,
 echten Häusern, Luftbild, Bäumen und Straßen. Das Spiel läuft ohne Installation im Browser, auch auf Laptops mit
 integrierter Grafik.
 
-Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
+Ein unabhängiges, nicht kommerzielles Hobbyprojekt. Gespielt wird ohne Waffen, damit auch Kinder mitmachen können.
+Die früheren Kampfmodi (Zombies, Söldner, Deathmatch, Waffenkammer) stecken noch im Code, sind aber ausgeblendet:
+`KAMPF_SICHTBAR` in `src/main.js` schaltet sie wieder ein. Die Abschnitte dazu weiter unten gelten nur dann.
 
 ## Was drinsteckt
 
@@ -17,8 +19,10 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
     ausgeblendet, `SOELDNER_SICHTBAR` in `src/main.js` schaltet ihn wieder ein.
 - **Munitionskisten:** Im Einzelspiel taucht immer wieder eine Kiste in der Nähe auf, erkennbar an einer Lichtsäule
   und einem gelben Punkt auf dem Radar. Drüberlaufen füllt die Reserve aller Waffen auf und bringt eine Granate.
-- **Bestenliste:** Am Ende einer Runde trägst du dich mit deinem Namen ein, getrennt nach Karte und Modus. Im Menü
-  zeigt **Bestenliste** die besten zehn.
+- **Bestenliste:** Am Ende eines Flugs kommt dein Ergebnis mit deinem Spielnamen in die Liste, getrennt nach Karte
+  und Modus. Eintragen geht nur mit **Google-Anmeldung** (freiwillig, Fliegen geht ohne). In der Liste steht der
+  Spielname, vom Konto speichert der Server nur eine pseudonyme Kennung, damit jedes Konto einmal vorkommt. Googles
+  Skript lädt erst nach dem Klick auf „Mit Google anmelden“. Im Menü zeigt **Bestenliste** die besten zehn.
 - **Sieben Karten:** Muchtown (Standard), OpenStreetMap 3D (Potsdamer Platz, Berlin), Dämmerungs-Stadt,
   Luxus-Atrium, Industrie-Lagerhalle, Wüsten-Außenposten und Nacht-Einsatz.
 - **Neun Waffen und eine Granate:** Ausgewählt werden sie in der Waffenkammer.
@@ -31,6 +35,34 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
 - **Karte und Navi:** Ziel auf der Karte anklicken, dann der Leuchtlinie am Boden folgen. Die Route führt bevorzugt
   über Straßen und Wege, mit Abbiegehinweisen und auf Wunsch mit Sprachansage.
 - **Mehrspieler:** 1 gegen 1 im Heimnetz über einen kleinen Server (siehe unten).
+- **Erkundungsflug:** ohne Gegner auf dem Besen durch Muchtown. Vor dem Start gibst du einen Namen ein. Goldene
+  Lichtsäulen markieren 15 Orte, darunter Kirche, Rathaus, Brunnen, Läden und die Kirchturmspitze. Ein Kompass zeigt
+  zum nächsten Ort. Jeder Fund gibt Punkte, und wer alle findet, bekommt einen Zeitbonus. Das Ergebnis kommt mit
+  deinem Namen in die Bestenliste. **Im Team** fliegen bis zu 8 Spieler zusammen über den Server. Jeder sieht die
+  anderen mit Namen und Abstand über dem Kopf, und die Funde zählen für alle. Das Radar oben rechts reicht 250 m
+  weit: blaue Punkte mit Namen sind die Mitflieger (▲/▼ deutlich höher oder tiefer, Ring = Schild an), goldene Rauten
+  die noch offenen Orte. Wer weiter weg ist, steht blasser am Rand und zeigt die Richtung.
+- **Navi zu Mitfliegern und Autopilot:** In der Karte (N) stehen rechts alle Mitflieger mit Abstand. „Weg“ (oder
+  Taste 1–9) zeigt die Luftroute zu ihm: ein Leuchtband über die Dächer, oben ein Hinweis mit Richtung, Abstand und
+  Höhe, im Radar eine Linie. Das Ziel wandert mit, wenn er weiterfliegt. „Autopilot“ (oder Taste P im Flug) fliegt
+  selbst hin, weit weg mit Boost, und bleibt dann neben ihm (Begleitflug). Wer selbst lenkt (W/A/S/D, Leertaste, C,
+  Maus kräftig bewegen, am Handy die Knöpfe), übernimmt wieder. Am Handy öffnet der Knopf „🧭 Navi“ die Karte.
+- **Besen-Manöver, Energiebälle, Schild:** Auf dem Besen fliegst du Looping, Fassrolle, Steilspirale und Korkenzieher
+  und zeigst einen Trick. Im Erkundungsflug spuckst du dazu Energiebälle und schaltest einen Schutzschild ein. Die
+  Mitflieger sitzen als Soldat auf dem Hexenbesen (`assets/models/soldier/SoldierBesen.glb`, gebaut in Blender) und
+  zeigen alles mit: Manöver, Lenken, Boost, Spucken und den Schild. Ein Treffer bremst nur kurz aus, mit Schild kostet
+  er ein Viertel Schildenergie. Lebenspunkte gibt es nicht. Unter dem Besenstiel hängt eine Minigun: Linke Maustaste
+  halten, die Läufe laufen an, dann gibt es Dauerfeuer mit Leuchtspur (Treffer bremsen bzw. kosten Schildenergie). Wer
+  stillsteht, schwebt locker auf dem Besen und streckt sich, gähnt oder klopft auf den Stiel. Abschalten lässt sich die
+  Minigun mit `MINIGUN_AN = false` in `src/main.js`.
+- **Wer ist online:** Im Menü steht „🟢 3 online · 12 heute · 345 gesamt“. Wer mit Spielnamen das Spiel öffnet oder
+  verlässt, wird allen anderen kurz angezeigt („Lars ist dem Spiel beigetreten“). Der Besucherzähler kommt ohne
+  Cookies aus: Der Server zählt Besucher je Tag über einen Hash aus IP-Adresse, Browserkennung und einem täglich neuen
+  Zufallswert, der nur im Arbeitsspeicher liegt, und speichert nur die Zahlen (`server/data/stats.json`).
+- **Handy:** Auf Handy und Tablet startet der Erkundungsflug im Querformat. Neigen lenkt: nach vorne kippen heißt
+  sinken, nach hinten steigen, rechts und links Kurve fliegen. Rechts liegen Schub, Bremse und Spirale, links Hoch und
+  Runter, oben Pause, „Mitte“ (Haltung neu ausrichten) und Neigen an/aus. Wischen dreht die Sicht. Die
+  Neigungssensoren gibt der Browser nur über HTTPS frei, iPhones fragen einmal nach Erlaubnis.
 
 ### Muchtown: Much als echtes Dorf
 
@@ -44,6 +76,8 @@ Ein unabhängiges, nicht kommerzielles Hobbyprojekt.
   eigene Fotos (Nr. 25, 27, Erdgeschoss von 29, Schild von 28). Dazu gezeichnete Fronten für Nr. 12 bis 17,
   Nr. 36 bis 50 (Billard-Vereinsheim bis Rathaus-Grill), Nr. 37 bis 53 auf der Gegenseite (Gothaer und Glücklich
   bis TintenPro und BIANGA) und die VR-Bank am Platz gegenüber der Kirche.
+- **Schulstraße:** rund 30 Wohnhäuser mit gezeichneter Fassade über die ganze Wand (Fenster, Klappläden,
+  Rollläden, Haustüren, Schiefer- und Klinkerwände), dazu die Neuapostolische Kirche und der Friseur an Nr. 21.
 - **St. Martinus mit Turm:** Im LoD2 fehlt der Kirchturm. Er ist nachgebaut (Maße aus dem 3D-Mesh von Geobasis NRW),
   mit Portal, Turmuhr und Schieferhelm; dazu der Kugelbrunnen vor der Bank.
 - **Spielfläche** 930 × 540 m. Start ist an der Hauptstraße beim Rathaus.
@@ -93,13 +127,12 @@ Ersatz-Zombies. Wie du das echte Modell einrichtest, steht unter [Zombie-Modell 
 
 ### Mehrspieler und Bestenliste (optional)
 
-Beides läuft über denselben kleinen Server. Dafür brauchst du zusätzlich Node.js 22 oder neuer. Für den Mehrspieler
-ist außerdem Internet nötig, weil die Client-Bibliothek von esm.sh geladen wird.
+Beides läuft über denselben kleinen Server. Dafür brauchst du zusätzlich Node.js 22 oder neuer.
 
 ```bash
 cd server
 npm install
-npm start          # Server auf Port 2567: Mehrspieler und Bestenliste
+npm start          # Server auf Port 2567: Mehrspieler, Erkundungsflug im Team, Lobby und Bestenliste
 ```
 
 Die Bestenliste speichert der Server in `server/data/highscores.json`. Läuft kein Server, zeigt das Spiel nur deinen
@@ -110,6 +143,11 @@ eigenen Rekord.
 - **Spiel öffnen:** Alle öffnen das Spiel über die IP-Adresse des Rechners, auf dem der Server läuft, zum Beispiel
   `http://192.168.178.20:8080`, und wählen **Mehrspieler (LAN)**.
 - **Server auf einem anderen Rechner:** Hänge `?server=ws://adresse:2567` an die Adresse des Spiels.
+- **Nur auf diesem Rechner:** `HOST=127.0.0.1 npm start` lässt den Server nur lokale Verbindungen annehmen.
+- **Google-Anmeldung:** Der Server prüft die Anmeldung gegen Googles öffentliche Schlüssel (`server/src/google-auth.ts`).
+  Die Client-ID steht in `src/auth.js` und als Vorgabe im Server (`GOOGLE_CLIENT_ID` überschreibt sie). Lokal klappt
+  die Anmeldung nur über `http://localhost:8080`, nicht über `127.0.0.1`. `HS_NO_AUTH=1` erlaubt Einträge ohne
+  Anmeldung (nur zum Testen), `HS_SALT` setzt das Salz für die pseudonyme Kennung.
 
 ## Steuerung
 
@@ -141,8 +179,18 @@ Auf dem Besen:
 | S | bremsen |
 | A / D | seitlich |
 | Leertaste / C oder Strg | steigen / sinken |
-| Mausrad hoch / runter | Spirale nach vorne / nach hinten |
-| Linksklick | zaubern |
+| Shift | Boost |
+| Mausrad hoch / runter | Korkenzieher nach vorne / nach hinten |
+| Q / E | Fassrolle links / rechts |
+| R / F | Looping nach oben / nach unten |
+| Z / U | Steilspirale links / rechts |
+| T | Trick |
+| Linksklick | zaubern (nicht im Erkundungsflug) |
+| V oder rechte Maustaste | Energieball spucken (Erkundungsflug) |
+| X | Schutzschild, 6 Sekunden, danach 8 Sekunden Pause (Erkundungsflug) |
+| linke Maustaste (halten) | Minigun: Läufe laufen an, dann Dauerfeuer (Erkundungsflug) |
+| N oder Tab | Karte mit Mitflieger-Liste: Weg zeigen (1–9) oder Autopilot (P) |
+| P | Autopilot zum gewählten (sonst zum nächsten) Mitflieger an / aus (Erkundungsflug im Team) |
 
 ## Projektaufbau
 
@@ -154,14 +202,27 @@ Auf dem Besen:
 | `src/weapons/` | Waffen in der Hand: Hände, Animationen, Materialien und Modelle (`models/`) |
 | `src/osm-level.js`, `src/nrw-level.js` | Kulissen aus OpenStreetMap und aus den NRW-Geodaten |
 | `src/much-shops.js` | Ladenfronten an der Hauptstraße in Much |
+| `src/much-houses.js` | Wohnhausfassaden an der Schulstraße in Much |
 | `src/much-landmarks.js` | Kirchturm von St. Martinus, Kugelbrunnen, Wandtexturen für Kirche und Bank |
-| `src/navmap.js` | Karte und Navi |
+| `src/navmap.js` | Karte und Navi, Mitflieger-Liste und Luftroute im Erkundungsflug |
+| `src/autopilot.js` | Autopilot: fliegt die Luftroute zum Mitflieger, dann Begleitflug |
 | `src/zombie-pak.js` | öffnet das verschlüsselte Zombie-Paket |
 | `src/pickups.js` | Munitionskisten |
-| `src/broom.js` | Flugbesen: Flugphysik, Spirale, Zauber, Fluggeräusch |
+| `src/broom.js` | Flugbesen: Flugphysik, Manöver, Boost, Zauber, Fluggeräusch |
+| `src/flight-moves.js` | Kurven der Besen-Manöver, gemeinsam für den eigenen Flug und die Mitflieger |
+| `src/flyer.js` | Mitflieger: Soldat auf dem Besen mit Animationen, Schild und nachgespielten Manövern |
+| `src/energyball.js` | Energiebälle: Flug, Treffer, Aufprall |
+| `src/shield.js` | Schutzschild-Effekt (Shader mit Blitz-Adern, Treffer-Welle, Farbstufen) |
+| `blender/` | Blender-Quelle des Besen-Soldaten (nur zum Bearbeiten, das Spiel lädt die `.glb`) |
+| `src/explore.js` | Erkundungsflug: Orte, Lichtsäulen, Punkte, Kompass |
+| `src/touch.js` | Handy-Steuerung: Neigen (DeviceOrientation) und Touch-Knöpfe |
 | `src/highscore.js` | Bestenliste: Abruf und Eintragen beim Server |
+| `src/auth.js` | Anmeldung mit Google (nur für die Bestenliste) |
+| `src/presence.js` | Wer ist online: Lobby, Beitritts-Meldungen, Besucherzähler |
+| `datenschutz.html` | Datenschutzhinweise |
+| `credits.html` | Credits und Lizenzhinweise (u. a. Minigun-Modell, CC BY 4.0) |
 | `src/music.js`, `audio/` | Musik und Soundeffekte |
-| `src/net.js`, `server/` | Mehrspieler mit Colyseus und die Bestenliste (`server/src/highscores.ts`) |
+| `src/net.js`, `server/` | Mehrspieler mit Colyseus (Räume `arena`, `explore` und `lobby`), Bestenliste (`server/src/highscores.ts`) und Besucherzähler (`server/src/visitors.ts`) |
 | `assets/` | Kartendaten (`nrw/`, `osm/`), Modelle und Sounds |
 | `ui/` | Vorschaubilder der Karten (`maps/`) und Waffen (`armory/`), Bild des Flugbesens |
 | `tools/` | Werkzeuge für Kartendaten, Fassadenfotos, Sounds und das Zombie-Modell (Python, Packen mit Node) |
@@ -212,6 +273,9 @@ Es gibt diese Zusatzoptionen:
 | `full` | Bild über die ganze Wand bis in den Giebel |
 | `photo` | eigenes, entzerrtes Foto der ganzen Wand statt der gezeichneten Front |
 | `photos` | Fotos, die die Zeichenfunktion einsetzt, z. B. ein Ladenschild (`P.photo(name, x0, x1, h0, h1)`) |
+| `street` | Straße, zu der die Front zeigt (sonst die Straße der Hausadresse) |
+| `raise` | stockt ein Haus um so viele Meter auf, wenn es nach dem LoD2-Stand erhöht wurde |
+| `px` | Auflösung im Texturatlas (Pixel je Meter, Standard 64; die Wohnhäuser nutzen 40) |
 
 Eigene Fotos entzerren: Quellbild, vier Eckpunkte und Wandmaß in `tools/fronts.json` eintragen, dann
 `python tools/rectify_fronts.py` (braucht Pillow und NumPy). Ergebnis: `assets/nrw/much/fronts/<name>.webp`.
@@ -262,6 +326,8 @@ Auf einen Webserver gehören nur `assets/models/zombie/zombie.pak` und `zombie.k
 | Texturiertes 3D-Mesh von Much (`assets/nrw/much/mesh/`, nur zum Ausprobieren) | Geobasis NRW, 3D-Mesh 2025, Datenlizenz Deutschland – Zero – 2.0 | noch nicht |
 | Straßen und Wege (`assets/osm/`) | © [OpenStreetMap-Mitwirkende](https://www.openstreetmap.org/copyright), ODbL 1.0 | ja |
 | Soldaten-Figur (`assets/models/soldier/Soldier.glb`) | aus den three.js-Beispielen, ursprünglich Mixamo (Adobe); nur im Spiel, nicht einzeln zum Download | ja |
+| Besen-Flieger (`assets/models/soldier/SoldierBesen.glb`, Quelle `blender/`) | dieselbe Soldaten-Figur, dazu Besen, Schild und Flug-Animationen in Blender ergänzt | ja |
+| Minigun am Besen (in `SoldierBesen.glb`) | „[M134 handheld (Minigun)](https://sketchfab.com/3d-models/m134-handheld-minigun-8f008c3e18934707a834cde8c72364f5)“ von [Alexander_Borisevich](https://sketchfab.com/boriseviav), [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/); Hinweis im Spiel unter „Credits & Lizenzen“ (`credits.html`) | ja |
 | Spielmusik (`audio/hauptspiel.wav`) | Ausschnitt aus „Del Rio Bravo“ von Kevin MacLeod, CC BY 3.0 (Hinweis siehe unten) | ja |
 | Menümusik (`audio/astronaut12-…-301131.mp3`) | „Energy Gaming Electro Trap …“ von astronaut12, Pixabay Content License | ja |
 | Sprung-Sound (`assets/audio/jump.mp3`) | Pixabay Content License | ja |
@@ -270,7 +336,7 @@ Auf einen Webserver gehören nur `assets/models/zombie/zombie.pak` und `zombie.k
 | Flugbesen in der Hand (`ui/besen.webp`) | eigenes Bild, erstellt mit Gemini (Google) | ja |
 | Waffenbilder der Waffenkammer (`ui/armory/`) | aus den Waffenmodellen des Spiels gerendert | ja |
 | Fassadenfotos in Much (`assets/nrw/much/fronts/`) | eigene Fotos und Videos vom Gehweg aus, entzerrt mit `tools/rectify_fronts.py` | ja |
-| Mehrspieler (`server/`, Client von esm.sh) | Colyseus, MIT | Server ja |
+| Mehrspieler (`server/`, Client `vendor/colyseus/colyseus.esm.js`, ESM-Build von esm.sh) | Colyseus, MIT | ja |
 | Zombie-Modell | „Zombie free VR / AR / low-poly“ von dremorn (CGTrader), Royalty Free License | nein, selbst laden |
 
 **Musik:** „Del Rio Bravo“ Kevin MacLeod ([incompetech.com](https://incompetech.com/)),

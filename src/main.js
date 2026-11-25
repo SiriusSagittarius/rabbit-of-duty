@@ -1,23 +1,31 @@
-// Rabbit of Duty — schlanker Three.js-FPS.
+// Flying Much — Flugspiel über Muchtown (Three.js). Die Kampfmodi stecken noch im Code, siehe KAMPF_SICHTBAR.
 // Forward-Renderer + gebackenes-Look-Licht + billige FX = läuft auch auf schwacher GPU.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { Net } from './net.js?v=2';
+import { Net } from './net.js?v=4';
 import { AudioManager } from './audio.js?v=5';
 import { Music } from './music.js?v=3';
 import { Arsenal, buildGrenadeMesh } from './arsenal.js?v=7';
-import { createBroom } from './broom.js?v=2';
+import { createBroom, BROOM_SPEED, BROOM_BOOST } from './broom.js?v=5';
+import { createAutopilot } from './autopilot.js?v=1';
+import { createEnergyBalls } from './energyball.js?v=1';
+import { loadFlyerTemplate, createFlyer, createMuzzleFlash, flickerFlash, FLYER_HEAD, MUZZLE_FROM_EYE, FIDGETS, SPIN_MAX, SPIN_UP, SPIN_DOWN } from './flyer.js?v=3';
+import { createExplore } from './explore.js?v=3';
+import { createTouch, isTouchDevice } from './touch.js?v=3';
 import { buildAtriumLevel } from './atrium-level.js?v=3';
-import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=31';
+import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=32';
 import { pointInPoly, closestOnPoly, segHitsPoly } from './poly2d.js';
-import { NavMap } from './navmap.js?v=3';
+import { NavMap } from './navmap.js?v=4';
 import { loadPak } from './zombie-pak.js?v=1';
 import { createPickups } from './pickups.js?v=1';
-import { fetchTop, submitScore, renderTop } from './highscore.js?v=1';
+import { fetchTop, submitScore, renderTop } from './highscore.js?v=3';
+import { auth } from './auth.js?v=1';
+import { createPresence } from './presence.js?v=1';
 
 // 3D-Shooter Soldaten-Template (GLTF-Modell mit Skelett & Animationen)
 let soldierTemplate = null;
+let flyerTemplate = null;            // Mitflieger: Soldat auf dem Besen (src/flyer.js, SoldierBesen.glb)
 let zombieTemplate = null;     // echtes Zombie-Modell (verschlüsselt in assets/models/zombie/, siehe README) – fehlt es, gibt es Ersatz-Zombies
 
 // ----------------------------------------------------------------------------
@@ -342,11 +350,6 @@ const crates = createPickups({
   onPickup: () => onCratePickup(),
 });
 
-const pickups = [];
-function carrot(x,z){
-  return null;
-}
-
 function loadMap(mapId = 'much') {
   currentMapId = mapId;
   broom.reset();
@@ -366,8 +369,6 @@ function loadMap(mapId = 'much') {
   liftZones.length = 0;
   worldColliders.length = 0;
   worldColliders.push(ground);
-  for (const p of pickups) scene.remove(p);
-  pickups.length = 0;
   crates.clear();
   showOsmCredit(null);
   terrainAt = null;
@@ -620,15 +621,34 @@ function loadMap(mapId = 'much') {
   player.onGround = true;
   setTimeout(warmUpGpu, 0);         // nach dem Aufbau (OSM-/NRW-Karten wärmen nach dem Laden nochmals vor)
 }
+// Handy/Tablet: Touch-Knöpfe und Neigungssteuerung für den Erkundungsflug (src/touch.js). Auf dem Handy gibt es nur
+// diesen Modus, Zombies brauchen Maus und Tastatur.
+const TOUCH = isTouchDevice();
+if (TOUCH) document.body.classList.add('touch');
+const touch = createTouch({
+  onPause: () => { if (state === 'playing') { state = 'paused'; setOverlay(); showPauseButtons(); } },
+  onSpiral: () => broom.wheel(1),
+  onNav: () => { if (state === 'playing') openNavMap(); },
+});
+// Erkundungsflug: Orte entdecken ohne Gegner, allein oder im Team (src/explore.js)
+const explore = createExplore({ scene, groundAt, banner: showBanner, chime: () => audio.pickup?.() });
+let exploreTeam = false;                     // im Erkundungsraum des Servers (statt Deathmatch-Arena)
+const BROOM_HELP = $('broomHelp')?.textContent || '';
+const BROOM_HELP_EXPLORE = 'W oder Maus 3: Schub · Shift: Boost · Maus lenkt · S: bremsen · Leertaste/C: hoch/runter · Esc: Pause'
+  + ' — Q/E: Rolle · R/F: Looping · Z/U: Spirale · Mausrad: Korkenzieher · T: Trick · V/rechte Maustaste: Energieball · X: Schild'
+  + ' · linke Maustaste: Minigun · N: Karte & Navi · P: Autopilot';
 // Vor dem ersten loadMap() anlegen: loadMap, resetRun und gameOver räumen den Besen auf.
 // Flugbesen (Taste B, siehe broom.js). Die Ich-Ansicht ist das Bild des Users, ui/besen.webp.
 const broom = createBroom({
   camera, audio, groundAt, player,
   overlay: $('broomView'), help: $('broomHelp'),
   onCast: (from) => hitscanShot(34, { from, color: '#8fe3ff', thick: 1.8, worldColor: '#8fe3ff', life: 0.14 }),
+  // Manöver gestartet: die Mitflieger spielen dieselbe Kurve und Animation nach (flyer.js)
+  onMove: (m) => sendFlyFx({ type: 'move', move: m.move, dir: m.dir, startTime: Date.now(), pitch: +m.pitch.toFixed(3) }),
 });
 function toggleBroom() {
   if (state !== 'playing') return;
+  if (gameMode === 'explore') return;                  // Erkundungsflug: immer auf dem Besen
   if (mpActive) { showBanner('BESEN NUR IM EINZELSPIEL'); return; }
   if (broom.active) {
     player.vy = THREE.MathUtils.clamp(broom.dismount(), -4, 4);   // weiterfallen statt in der Luft stehen
@@ -639,6 +659,320 @@ function toggleBroom() {
     broom.mount();
   }
 }
+
+// ---------- Besen-Extras: Manöver-Tasten, Energiebälle, Schutzschild (BESEN-AUFGABEN.md) ----------
+// Manöver gehen überall auf dem Besen, Energieball und Schild nur im Erkundungsflug. Im Team sehen die anderen alles:
+// Zustand (Animation, Lenkeinschlag, Schild) geht mit der Position mit, Ereignisse als Nachricht 'fx' (onFlyFx).
+// Ein Treffer ohne Schild bremst nur kurz aus, mit Schild kostet er Schildenergie. Lebenspunkte gibt es nicht.
+const SHIELD_DUR = 6, SHIELD_CD = 8, SHIELD_HIT = 0.25;   // s an, s Abklingen danach, Energie je Treffer
+const SPIT_CD = 0.6, SPIT_ANIM = 0.58;                       // s zwischen zwei Bällen, Länge der Animation Spit
+// Minigun am Besen. Für ein reines Kinder-Spiel auf false stellen: dann hat das Modell keine Minigun und es gibt kein Feuer.
+const MINIGUN_AN = true;
+const MG_RATE = 18, MG_RANGE = 220, MG_SPREAD = 0.012;         // Schuss/s, Reichweite m, Streuung
+const MG_FLUSH = 0.25, MG_SHIELD_PER_HIT = 0.035;              // Treffer je Ziel sammeln (s), Schildenergie je Kugel
+const fly = { spitCd: 0, spitT: 0, ballId: 0, shOn: false, shT: 0, shCd: 0, shE: 1, hudT: 0,
+  mgFire: false, mgSpin: 0, mgShotT: 0, mgFlushT: 0, mgHits: new Map(), toastAt: new Map(),
+  fidget: '', fidgetT: 0, fidgetWait: 10 };
+const pilot = createAutopilot({ speed: BROOM_SPEED, boost: BROOM_BOOST });   // Navi-Autopilot (weiter unten)
+const ap = { on: false, mouse: 0 };
+const balls = createEnergyBalls({ scene, groundAt, solidAt, onImpact: (p) => impact(p, '#9fe8ff', 10) });
+const FLY_KEYS = {                                           // Tastenposition (e.code); Z und Y beide für QWERTZ/QWERTY
+  KeyQ: ['roll', 'left'], KeyE: ['roll', 'right'], KeyR: ['looping', 'fwd'], KeyF: ['looping', 'back'],
+  KeyZ: ['spiral', 'left'], KeyY: ['spiral', 'left'], KeyU: ['spiral', 'right'], KeyT: ['trick', ''],
+};
+const _fd = new THREE.Vector3(), _fu = new THREE.Vector3(), _fp = new THREE.Vector3();
+const arr3 = (v) => [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)];
+const vec3 = (a) => (Array.isArray(a) && a.length === 3 ? new THREE.Vector3(+a[0] || 0, +a[1] || 0, +a[2] || 0) : null);
+
+/** Taste auf dem Besen. true = gehört zum Flug (dann keine Waffen- oder Haltungstaste). */
+function flyKey(e){
+  const m = FLY_KEYS[e.code];
+  if (m) { if (!e.repeat) broom.startMove(m[0], m[1]); return true; }
+  if (gameMode !== 'explore') return false;
+  if (e.code === 'KeyV') { if (!e.repeat) spit(); return true; }
+  if (e.code === 'KeyX') { if (!e.repeat) shieldOn(); return true; }
+  return false;
+}
+function sendFlyFx(d){ if (exploreTeam && net.connected) net.sendFx(d); }
+/** Steckt der Punkt in einem Gebäude (Grundriss mit Unter- und Oberkante)? Für die Energiebälle. */
+function solidAt(x, y, z){
+  for (const o of obstaclesNear(x, z, x, z)) {
+    if (x < o.minX || x > o.maxX || z < o.minZ || z > o.maxZ) continue;
+    const minY = o.minY !== undefined ? o.minY : -999, maxY = o.maxY !== undefined ? o.maxY : (o.top !== undefined ? o.top : 999);
+    if (y < minY || y > maxY) continue;
+    if (!o.poly || pointInPoly(x, z, o.poly)) return true;
+  }
+  return false;
+}
+/** Höchster Punkt um x/z (Gelände, Dächer, Bäume; Grundriss als Rechteck) – für die Luftroute des Navis. */
+function ceilingAt(x, z, r = 3){
+  let top = groundAt(x, z);
+  for (const o of obstaclesNear(x - r, z - r, x + r, z + r)) {
+    if (x < o.minX - r || x > o.maxX + r || z < o.minZ - r || z > o.maxZ + r) continue;
+    const t = o.maxY !== undefined ? o.maxY : (o.top ?? 0);
+    if (t > top) top = t;
+  }
+  return top;
+}
+/** Energieball aus dem Mund (bei sich selbst knapp vor und unter der Kamera), Richtung = Blickrichtung. */
+function spit(){
+  if (!broom.active || state !== 'playing' || fly.spitCd > 0) return;
+  fly.spitCd = SPIT_CD; fly.spitT = SPIT_ANIM;
+  camera.getWorldDirection(_fd);
+  _fu.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  _fp.copy(camera.position).addScaledVector(_fd, 0.8).addScaledVector(_fu, -0.18);
+  const id = ++fly.ballId;
+  balls.spawn({ pos: _fp, dir: _fd, owner: 'me', id, local: true });
+  broom.sfx('spit');
+  sendFlyFx({ type: 'spit', id, pos: arr3(_fp), dir: arr3(_fd) });
+}
+function shieldOn(){
+  if (!broom.active || state !== 'playing' || fly.shOn || fly.shCd > 0) return;
+  fly.shOn = true; fly.shT = SHIELD_DUR; fly.shE = 1;
+  broom.sfx('shield'); flyHud();
+}
+function shieldOff(broken){
+  if (!fly.shOn) return;
+  fly.shOn = false; fly.shCd = SHIELD_CD;
+  broom.sfx('shieldOff');
+  if (broken) showToast('🛡 Dein Schild ist zerbrochen', 'leave');
+  flyHud();
+}
+/** Mein Schild hat einen Treffer abgefangen (dmg: Energieball 0,25, Minigun je nach Kugeln). */
+function ownShieldHit(dmg = SHIELD_HIT){
+  if (!fly.shOn) return;
+  fly.shE = Math.max(0, fly.shE - THREE.MathUtils.clamp(+dmg || SHIELD_HIT, 0, 1));
+  flyFlash('shield-hit');
+  if (fly.shE <= 0.001) shieldOff(true);
+  flyHud();
+}
+/** Ein Mitflieger meldet: Ich bin getroffen. Hat mein Schild gerade gehalten, zählt es als Schildtreffer. */
+function gotHit(from, point, w){
+  const mg = w === 'mg';
+  if (fly.shOn) { const dmg = mg ? 0.1 : SHIELD_HIT; ownShieldHit(dmg); sendFlyFx({ type: 'shieldHit', target: net.sessionId, point: arr3(point), ball: -1, dmg }); return; }
+  broom.knock(mg ? 0.35 : 1); if (!mg) broom.sfx('hit'); flyFlash('hit');
+  const now = performance.now();
+  if (!mg || now - (fly.toastAt.get(from) || 0) > 3000) {              // Minigun: Meldung höchstens alle 3 s
+    fly.toastAt.set(from, now);
+    showToast(`${mg ? '🔫' : '💥'} Getroffen von ${net.getPlayer(from)?.name || 'einem Mitflieger'}`, 'leave');
+  }
+}
+function flyFlash(kind){
+  const v = $('shieldVignette'); if (!v) return;
+  v.classList.remove('hit', 'shield-hit'); void v.offsetWidth; v.classList.add(kind);
+}
+function flyHud(){
+  fly.hudT = 0.2;
+  const el = $('flyHud'); if (!el) return;
+  const bars = Math.round(fly.shE * 4);
+  const sh = fly.shOn ? `🛡 Schild an · ${Math.ceil(fly.shT)} s · ${'▮'.repeat(bars)}${'▯'.repeat(4 - bars)}`
+    : fly.shCd > 0 ? `🛡 Schild lädt · ${Math.ceil(fly.shCd)} s` : '🛡 X: Schild';
+  const txt = `${sh}<br>💥 V / rechte Maustaste: Energieball${MINIGUN_AN ? '<br>🔫 linke Maustaste: Minigun' : ''}`;
+  if (el.dataset.t !== txt) { el.innerHTML = txt; el.dataset.t = txt; }
+  el.classList.toggle('on', fly.shOn);
+}
+/** Ein Bild: Abklingzeiten, Schild, Energiebälle (eigene treffen Mitflieger), Anzeige. */
+function flyUpdate(dt){
+  fly.spitCd = Math.max(0, fly.spitCd - dt); fly.spitT = Math.max(0, fly.spitT - dt);
+  if (fly.shOn && (fly.shT -= dt) <= 0) shieldOff(false);
+  if (!fly.shOn) fly.shCd = Math.max(0, fly.shCd - dt);
+  const targets = [];
+  if (exploreTeam && balls.count) for (const [id, a] of remoteAvatars) {
+    if (!a.flyer) continue;
+    const p = net.getPlayer(id);
+    targets.push({ id, test: (pt) => a.flyer.hitTest(pt, !!(p && p.sh)) });
+  }
+  for (const h of balls.update(dt, targets)) {
+    const p = net.getPlayer(h.id), a = remoteAvatars.get(h.id);
+    if (p && p.sh) { a?.flyer?.shield.hit(h.point); sendFlyFx({ type: 'shieldHit', target: h.id, point: arr3(h.point), ball: h.ball }); }
+    else { impact(h.point, '#9fe8ff', 14); showHitmarker(false); sendFlyFx({ type: 'hit', target: h.id, point: arr3(h.point), ball: h.ball }); }
+  }
+  // Minigun: anlaufen, solange der Abzug gedrückt ist, erst bei voller Drehzahl feuern
+  const trig = MINIGUN_AN && fly.mgFire && broom.active && state === 'playing';
+  fly.mgSpin = trig ? Math.min(SPIN_MAX, fly.mgSpin + dt * SPIN_MAX / SPIN_UP) : Math.max(0, fly.mgSpin - dt * SPIN_MAX / SPIN_DOWN);
+  const mgOn = trig && fly.mgSpin >= SPIN_MAX * 0.9;
+  if (mgOn) { fly.mgShotT -= dt; while (fly.mgShotT <= 0) { fly.mgShotT += 1 / MG_RATE; mgShot(); } } else fly.mgShotT = 0;
+  if (mgOn) localMuzzle(mgFlash.position);
+  flickerFlash(mgFlash, mgOn, 0.3);
+  mgWhine(fly.mgSpin / SPIN_MAX);
+  if ((fly.mgFlushT -= dt) <= 0) { fly.mgFlushT = MG_FLUSH; if (fly.mgHits.size) flushMgHits(); }
+  // Stillstand: alle 8–15 s ein Fidget (Strecken, Gähnen, Klopfen) – sehen die Mitflieger über den Animationsnamen
+  const idle = broom.active && broom.hovering && fly.spitT <= 0 && !fly.mgFire;
+  if (!idle) { fly.fidget = ''; fly.fidgetWait = 8 + Math.random() * 7; }
+  else if (fly.fidget) { if ((fly.fidgetT -= dt) <= 0) { fly.fidget = ''; fly.fidgetWait = 8 + Math.random() * 7; } }
+  else if ((fly.fidgetWait -= dt) <= 0) {
+    fly.fidget = FIDGETS[Math.floor(Math.random() * FIDGETS.length)];
+    fly.fidgetT = flyerTemplate?.fidgetDur?.[fly.fidget] || 2.4;
+  }
+  document.body.classList.toggle('shield-on', fly.shOn);
+  if ((fly.hudT -= dt) <= 0) flyHud();
+}
+function resetFly(){
+  balls.clear();
+  fly.shOn = false; fly.shT = 0; fly.shCd = 0; fly.shE = 1; fly.spitCd = 0; fly.spitT = 0;
+  fly.mgFire = false; fly.mgSpin = 0; fly.mgHits.clear(); fly.fidget = ''; fly.fidgetWait = 10;
+  mgFlash.visible = false; mgWhine(0);
+  document.body.classList.remove('shield-on');
+  ap.on = false; ap.mouse = 0; pilot.reset();
+  nav?.clearFriend(true);
+}
+
+// ---------- Navi zu Mitfliegern + Autopilot (navmap.js, autopilot.js) ----------
+// Karte (N) → Mitflieger wählen: Leuchtband in der Luft zu ihm. P oder „Autopilot“ in der Karte: der Besen fliegt
+// selbst hin und dann neben ihm her. Selbst lenken (W/A/S/D, Leertaste, C/Strg, Maus kräftig bewegen, Handy-Knöpfe)
+// schaltet den Autopiloten aus; Manöver, Energieball, Schild und Minigun gehen weiter.
+const AP_MOUSE_OFF = 260;                                     // Pixel Mausweg (klingt ab), ab dem man selbst lenkt
+const _apGoal = new THREE.Vector3(), _apTv = new THREE.Vector3(), _apZero = new THREE.Vector3();
+/** Mitflieger fürs Navi (Augenhöhe, Blickrichtung, Fahrt); null außerhalb des Erkundungsflugs. */
+function friendList(){
+  if (gameMode !== 'explore') return null;
+  const out = [];
+  if (!exploreTeam || !net.connected) return out;
+  for (const [id, a] of remoteAvatars) {
+    const p = net.getPlayer(id); if (!p) continue;
+    out.push({ id, name: p.name || 'Mitflieger', x: a.g.position.x, y: a.g.position.y + (a.flyer ? FLYER_HEAD : 1.6), z: a.g.position.z,
+      ry: p.ry || 0, vel: a.vel || _apZero });
+  }
+  return out;
+}
+function autopilotOn(){
+  if (gameMode !== 'explore' || !broom.active) return false;
+  if (!nav.friend) {                                          // noch kein Ziel gewählt: der nächste Mitflieger
+    let best = null, bd = Infinity;
+    for (const f of friendList() || []) {
+      const d = Math.hypot(f.x - camera.position.x, f.y - camera.position.y, f.z - camera.position.z);
+      if (d < bd) { bd = d; best = f; }
+    }
+    if (!best) { showBanner(exploreTeam ? 'NOCH KEIN MITFLIEGER IM TEAM' : 'AUTOPILOT GIBT ES IM TEAM-FLUG'); return false; }
+    nav.setFriend(best.id, camera.position);
+  }
+  ap.on = true; ap.mouse = 0; pilot.reset();
+  showBanner('🤖 AUTOPILOT AN');
+  nav.say(`Autopilot an. Ziel: ${nav.friend.name}.`);
+  return true;
+}
+function autopilotOff(why){
+  if (!ap.on) return;
+  ap.on = false;
+  showBanner(why === 'steer' ? 'AUTOPILOT AUS – DU LENKST' : 'AUTOPILOT AUS');
+  if (why !== 'lost') nav.say('Autopilot aus.');
+}
+/** Ein Bild auf dem Besen: Autopilot lenken lassen. Gibt die gewünschte Geschwindigkeit zurück (oder null). */
+function autopilotStep(dt, ti){
+  ap.mouse *= Math.exp(-3 * dt);
+  if (!ap.on) return null;
+  const manual = keys['KeyW'] || keys['KeyA'] || keys['KeyS'] || keys['KeyD'] || keys['Space'] || keys['KeyC']
+    || keys['ControlLeft'] || keys['ControlRight'] || (ti && (ti.thrust || ti.brake || ti.up || ti.down)) || ap.mouse > AP_MOUSE_OFF;
+  if (manual) { autopilotOff('steer'); return null; }
+  const f = nav.friend && nav.friendById(nav.friend.id);
+  if (!f) { autopilotOff('lost'); return null; }
+  _apGoal.set(f.x, f.y, f.z);
+  const r = pilot.update(dt, { pos: camera.position, yaw, pitch, cur: broom.speed, goal: _apGoal, goalVel: f.vel, goalYaw: f.ry,
+    ahead: (L, out) => nav.airAhead(L, out) || out.copy(_apGoal) });
+  yaw = r.yaw; pitch = r.pitch;
+  return r.vel;
+}
+/** Ereignis eines Mitfliegers (Server-Raum 'explore', Nachricht 'fx'). */
+function onFlyFx(d){
+  if (!exploreTeam || !d || !d.from) return;
+  const f = remoteAvatars.get(d.from)?.flyer;
+  if (d.type === 'move') { f?.playMove(d.move, d.dir, +d.pitch || 0); return; }
+  if (d.type === 'spit') {
+    const dir = vec3(d.dir); if (!dir) return;
+    f?.playOnce('Spit');
+    const pos = f ? f.mouthPos(_fp) : vec3(d.pos); if (!pos) return;
+    balls.spawn({ pos, dir, owner: d.from, id: d.id | 0 });
+    return;
+  }
+  const pt = vec3(d.point); if (!pt) return;
+  balls.remove(d.from, d.ball | 0, false);
+  if (d.type === 'shieldHit') {
+    if (d.target === net.sessionId) ownShieldHit(d.dmg);
+    else remoteAvatars.get(d.target)?.flyer?.shield.hit(pt);
+  } else if (d.type === 'hit') {
+    if (d.target === net.sessionId) gotHit(d.from, pt, d.w);
+    else impact(pt, '#9fe8ff', d.w === 'mg' ? 5 : 12);
+  }
+}
+
+// ---------- Minigun am Besen (BESEN-AUFGABEN.md 3b) ----------
+// Linke Maustaste im Erkundungsflug: Läufe laufen in 0,3 s an, erst bei voller Drehzahl wird gefeuert (MG_RATE/s,
+// Leuchtspur aus der Mündung zur Bildmitte). Treffer an Mitfliegern werden je Ziel gesammelt und alle MG_FLUSH s
+// gemeldet: ohne Schild bremst das kurz ab, mit Schild kostet jede Kugel etwas Schildenergie. Lebenspunkte gibt es nicht.
+const _md = new THREE.Vector3(), _mu = new THREE.Vector3(), _mo = new THREE.Vector3(), _me = new THREE.Vector3(), _mt = new THREE.Vector3();
+const mgFlash = createMuzzleFlash(); scene.add(mgFlash);
+/** Eigene Mündung: so weit vor und unter der Kamera wie beim Modell (flyer.js MUZZLE_FROM_EYE). */
+function localMuzzle(out){
+  camera.getWorldDirection(_md);
+  _mu.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  return out.copy(camera.position).addScaledVector(_md, MUZZLE_FROM_EYE.fwd).addScaledVector(_mu, -MUZZLE_FROM_EYE.down);
+}
+function mgShot(){
+  localMuzzle(_mo);
+  // Ziel: Bildmitte in 60 m (bzw. die Wand davor), leicht gestreut; die Kugel fliegt von der Mündung dorthin
+  _mt.copy(camera.position).addScaledVector(_md, 60);
+  _md.subVectors(_mt, _mo).normalize();
+  _md.x += (Math.random() - 0.5) * 2 * MG_SPREAD; _md.y += (Math.random() - 0.5) * 2 * MG_SPREAD; _md.z += (Math.random() - 0.5) * 2 * MG_SPREAD;
+  _md.normalize();
+  ray.set(_mo, _md); ray.far = MG_RANGE;
+  const w = ray.intersectObjects(worldColliders, true)[0];
+  ray.far = Infinity;
+  let best = w ? w.distance : MG_RANGE, hitId = null;
+  if (exploreTeam) for (const [id, a] of remoteAvatars) {
+    if (!a.flyer) continue;
+    const p = net.getPlayer(id), t = a.flyer.rayHit(_mo, _md, !!(p && p.sh));
+    if (t >= 0 && t < best) { best = t; hitId = id; }
+  }
+  _me.copy(_mo).addScaledVector(_md, best);
+  tracer(_mo, _me, '#ffd27a', 1.2, 0.06);
+  if (hitId) {
+    const h = fly.mgHits.get(hitId) || { n: 0, point: new THREE.Vector3() };
+    h.n++; h.point.copy(_me); fly.mgHits.set(hitId, h);
+    const p = net.getPlayer(hitId);
+    if (p && p.sh) remoteAvatars.get(hitId)?.flyer?.shield.hit(_me);
+    else if (Math.random() < 0.4) impact(_me.clone(), '#9fe8ff', 4);
+  } else if (w && Math.random() < 0.4) impact(w.point, '#ffcf7a', 3);
+  audio.play('shot_rifle', { volume: 0.26, pitch: 1.35, pitchJitter: 0.08 });
+}
+/** Gesammelte Treffer melden (eine Nachricht je Ziel und MG_FLUSH). */
+function flushMgHits(){
+  for (const [id, h] of fly.mgHits) {
+    const p = net.getPlayer(id);
+    if (p && p.sh) sendFlyFx({ type: 'shieldHit', target: id, point: arr3(h.point), ball: -1, dmg: +Math.min(1, h.n * MG_SHIELD_PER_HIT).toFixed(3) });
+    else { sendFlyFx({ type: 'hit', target: id, point: arr3(h.point), ball: -1, w: 'mg' }); showHitmarker(false); }
+  }
+  fly.mgHits.clear();
+}
+/** Schüsse eines Mitfliegers (nur zum Ansehen): Leuchtspur aus seiner Mündung in seine Blickrichtung, Ton nach Abstand. */
+function remoteMgShot(a, p){
+  const from = a.flyer.muzzlePos(_mo);
+  const cp = Math.cos(p.pt || 0);
+  _md.set(-Math.sin(p.ry) * cp, Math.sin(p.pt || 0), -Math.cos(p.ry) * cp);
+  _md.x += (Math.random() - 0.5) * 0.03; _md.y += (Math.random() - 0.5) * 0.03; _md.z += (Math.random() - 0.5) * 0.03;
+  tracer(from, _me.copy(from).addScaledVector(_md.normalize(), 90), '#ffd27a', 1.2, 0.06);
+  a.mgSnd = !a.mgSnd;
+  const vol = 0.24 * (1 - Math.min(1, from.distanceTo(camera.position) / 160));
+  if (a.mgSnd && vol > 0.02) audio.play('shot_rifle', { volume: vol, pitch: 1.35, pitchJitter: 0.08 });
+}
+// Anlauf-Surren: Sägezahn durch einen Tiefpass, Tonhöhe und Lautstärke folgen der Drehzahl
+let mgSnd = null;
+function mgWhine(k){
+  const c = audio.ctx;
+  if (!c || audio.muted || k <= 0.01) {
+    if (mgSnd) { const s = mgSnd, t = s.c.currentTime; mgSnd = null; s.g.gain.setTargetAtTime(0, t, 0.05); s.o.stop(t + 0.4); }
+    return;
+  }
+  if (!mgSnd) {
+    const o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 1400; g.gain.value = 0;
+    o.connect(f).connect(g).connect(c.destination); o.start();
+    mgSnd = { o, g, c };
+  }
+  const t = c.currentTime;
+  mgSnd.o.frequency.setTargetAtTime(60 + 340 * k, t, 0.05);
+  mgSnd.g.gain.setTargetAtTime(0.045 * k * (audio.volume ?? 0.85), t, 0.06);
+}
+
 
 loadMap(currentMapId);
 
@@ -771,7 +1105,13 @@ function outlineShell(mesh, scale=1.07){ const o=new THREE.Mesh(mesh.geometry, o
 // wir machen da später noch was“. Der Code bleibt vollständig. Mit true kommen die Modus-Wahl im Startmenü,
 // die Umschalter in Pause und Game Over und die Söldner-Spalte der Bestenliste zurück.
 const SOELDNER_SICHTBAR = false;
-let gameMode = SOELDNER_SICHTBAR ? (localStorage.getItem('rod.gameMode') || 'classic') : 'zombies'; // 'classic' | 'zombies'
+// Kampfmodi (Zombies, Söldner, Deathmatch, Waffenkammer) ausgeblendet: Flying Much ist für Kinder gedacht, niemand hat
+// eine Waffe in der Hand. true zeigt sie wieder (später z. B. nur für angemeldete Erwachsene).
+const KAMPF_SICHTBAR = false;
+if (!KAMPF_SICHTBAR) document.body.classList.add('nokampf');
+const MODES_OK = !KAMPF_SICHTBAR ? ['explore'] : SOELDNER_SICHTBAR ? ['classic', 'zombies', 'explore'] : ['zombies', 'explore'];
+let gameMode = (TOUCH || !KAMPF_SICHTBAR) ? 'explore'             // 'classic' | 'zombies' | 'explore'
+  : (MODES_OK.includes(localStorage.getItem('rod.gameMode')) ? localStorage.getItem('rod.gameMode') : 'zombies');
 
 function pickEnemyType(){
   if (gameMode === 'zombies') {
@@ -1160,6 +1500,7 @@ function zombieDie(e){
 
 let wave = 0, aliveTarget = 0;
 function startWave(){
+  if (gameMode === 'explore') return;                  // Erkundungsflug: keine Gegner
   wave++;
   ui.wave.textContent = wave;
   const isZ = (gameMode === 'zombies');
@@ -1353,8 +1694,11 @@ addEventListener('keydown', e=>{
   if ((e.code === 'KeyN' || e.code === 'Tab') && state === 'playing') { e.preventDefault(); openNavMap(); return; }
   keys[e.code]=true;
   if (e.code === 'KeyB') { toggleBroom(); return; }
+  if (e.code === 'KeyP' && gameMode === 'explore' && state === 'playing') { if (!e.repeat) { if (ap.on) autopilotOff('key'); else autopilotOn(); } return; }
+  if (broom.active && flyKey(e)) return;                  // Manöver, Energieball, Schild
   // Auf dem Besen: keine Waffen- und Haltungstasten (C und Strg heißen dort sinken)
   if (broom.active && /^(KeyR|Digit[12]|KeyE|KeyV|KeyC|KeyX|KeyY|KeyZ|ControlLeft|ControlRight)$/.test(e.code)) return;
+  if ((gameMode === 'explore' || !KAMPF_SICHTBAR) && /^(KeyR|Digit[12]|KeyG|KeyE|KeyV|KeyX|KeyY|KeyZ)$/.test(e.code)) return;   // keine Waffen
   if(e.code==='KeyR') arsenal.reload();
   if(e.code==='Digit1') { arsenal.switchSlot('primary'); updateAmmo(); updateWeaponHud(); }
   if(e.code==='Digit2') { arsenal.switchSlot('secondary'); updateAmmo(); updateWeaponHud(); }
@@ -1387,15 +1731,18 @@ addEventListener('mousemove', e=>{
 
   const isSniper = Boolean(arsenal.currentWeapon?.scope);
   const s = (ads && isSniper) ? 0.00045 : (ads ? 0.0011 : 0.0022);
+  if (ap.on) ap.mouse += Math.abs(mx) + Math.abs(my);     // Autopilot: kräftig bewegen = selbst lenken
   yaw -= mx*s; pitch -= my*s;
   pitch = Math.max(-1.5, Math.min(1.5, pitch));
   yaw = ((yaw + Math.PI) % (Math.PI * 2) + (Math.PI * 2)) % (Math.PI * 2) - Math.PI;
 });
 addEventListener('mousedown', e=>{
   if(document.pointerLockElement!==canvas) return;
-  if (broom.active) {                     // Besen: links = Zauber, Mitte (Maus 3) = Schub
-    if (e.button === 0) broom.fire(true);
+  if (broom.active) {                     // Besen: links = Zauber, Mitte (Maus 3) = Schub, rechts = Energieball
+    if (e.button === 0 && gameMode !== 'explore') broom.fire(true);   // Erkundungsflug: keine Zauber, dafür die Minigun
+    if (e.button === 0 && gameMode === 'explore' && MINIGUN_AN) fly.mgFire = true;
     if (e.button === 1) { e.preventDefault(); broom.setThrust(true); }
+    if (e.button === 2 && gameMode === 'explore') spit();
     return;
   }
   if(e.button===0) {
@@ -1409,7 +1756,7 @@ addEventListener('mousedown', e=>{
   if(e.button===2) ads=true;
 });
 addEventListener('mouseup', e=>{
-  if(e.button===0) { firing=false; arsenal.setTrigger(false); broom.fire(false); }
+  if(e.button===0) { firing=false; arsenal.setTrigger(false); broom.fire(false); fly.mgFire = false; }
   if(e.button===1) broom.setThrust(false);
   if(e.button===2) ads=false;
 });
@@ -1547,14 +1894,30 @@ function setOverlay(){ music.setMode(state==='playing' ? 'game' : (state==='paus
   ui.start.style.display = state==='ready'?'flex':'none';
   ui.pause.style.display = state==='paused'?'flex':'none';
   ui.gameover.style.display = state==='over'?'flex':'none';
+  const fin = $('pauseFinishBtn'); if (fin) fin.style.display = (gameMode === 'explore' && explore.active) ? '' : 'none';
+  touch.show(TOUCH && state === 'playing');
   syncMusicUi(); }
-function lock(){ canvas.requestPointerLock(); }
+/** Spiel aufnehmen: am PC per Pointer-Lock (pointerlockchange setzt 'playing'), auf dem Handy direkt. */
+function lock(){
+  if (!TOUCH) { canvas.requestPointerLock(); return; }
+  if (state === 'ready' || state === 'paused' || state === 'map') {
+    if (state === 'ready') arsenal.resetActions?.();
+    state = 'playing'; setOverlay(); onPlayStart();
+  }
+}
+/** Beim Übergang ins Spiel: im Erkundungsflug sitzt man sofort auf dem Besen. */
+function onPlayStart(){
+  if (gameMode === 'explore' && explore.active && !broom.active) broom.mount();
+}
+/** Klick im Startmenü: Erkundungsflug fragt erst nach dem Namen, sonst geht es los. */
+function startClick(){ audio.ensure(); if (gameMode === 'explore') openExploreDialog(); else lock(); }
 document.addEventListener('pointerlockchange', ()=>{
   if(document.pointerLockElement===canvas){
     if(state==='ready'||state==='paused'||state==='map'){
       if(state==='ready') arsenal.resetActions?.();
       state='playing';
       setOverlay();
+      onPlayStart();
     }
   } else {
     if(state==='playing'){
@@ -1564,8 +1927,8 @@ document.addEventListener('pointerlockchange', ()=>{
     }
   }
 });
-ui.start.addEventListener('click', ()=>{ audio.ensure(); lock(); });
-canvas.addEventListener('click', ()=>{ if(state==='ready'){ audio.ensure(); lock(); } });
+ui.start.addEventListener('click', ()=>{ startClick(); });
+canvas.addEventListener('click', ()=>{ if(state==='ready') startClick(); });
 
 // Pause-Menü-Buttons
 function showPauseButtons(){ $('pauseButtons').style.display='flex'; $('pauseControls').style.display='none'; }
@@ -1582,11 +1945,13 @@ ui.pause.addEventListener('click', e=>{
 ui.gameover.addEventListener('click', e=>{ if(e.target.getAttribute('data-act')==='restart') restart(); });
 function quit(){
   if(mpActive || net.connected){ net.disconnect(); clearRemotes(); mpActive=false; frags=0; $('frags').style.display='none'; $('mpStatus').textContent=''; }
+  exploreTeam = false;
   state='ready'; setOverlay(); resetRun();
 }
 function restart(){ resetRun(); state='ready'; setOverlay(); }
 function resetRun(){
-  broom.reset();
+  broom.reset(); resetFly();
+  explore.stop(); document.body.classList.remove('explore');
   for(const e of enemies){
     if (e.mixer) e.mixer.stopAllAction();
     scene.remove(e.g);
@@ -1691,7 +2056,8 @@ const fwd = new THREE.Vector3(), right = new THREE.Vector3(), tmp = new THREE.Ve
 let stepTimer = 0;
 function update(dt){
   // Blickrichtung
-  camera.rotation.set(pitch, yaw, broom.active ? broom.roll : 0, 'YXZ');   // auf dem Besen mit Schräglage und Spirale
+  if (broom.active) broom.orient(camera.quaternion, yaw, pitch);   // Besen: Schräglage und Manöver (Looping, Rolle …)
+  else camera.rotation.set(pitch, yaw, 0, 'YXZ');
   recoil.x *= Math.pow(0.001,dt); recoil.y *= Math.pow(0.001,dt);
 
   // Bewegung
@@ -1706,8 +2072,21 @@ function update(dt){
   let speed = 5.2;
   if (broom.active) {
     // Flugbesen: eigene Flugphysik (broom.js), danach dieselbe Kollision wie zu Fuß
-    broom.update(dt, { yaw, pitch, forward: !!keys['KeyW'], brake: !!keys['KeyS'], left: !!keys['KeyA'], right: !!keys['KeyD'],
-      up: !!keys['Space'], down: !!(keys['KeyC'] || keys['ControlLeft'] || keys['ControlRight']) });
+    const ti = TOUCH && touch.shown ? touch.state : null;
+    const auto = autopilotStep(dt, ti);      // Autopilot: lenkt selbst (yaw, pitch) und gibt die Fahrt vor
+    if (ti) {                                // Handy: Neigen lenkt, Wischen dreht die Sicht (src/touch.js)
+      const c = touch.consume(dt);
+      if (!auto) {                           // mit Autopilot zählt die Neigung nicht
+        yaw += c.yawDelta;
+        if (c.pitchTarget !== null) pitch += (c.pitchTarget - pitch) * (1 - Math.exp(-4 * dt));
+        else pitch += c.pitchDelta;
+        pitch = Math.max(-1.5, Math.min(1.5, pitch));
+        yaw = ((yaw + Math.PI) % (Math.PI * 2) + (Math.PI * 2)) % (Math.PI * 2) - Math.PI;
+      }
+    }
+    broom.update(dt, { yaw, pitch, auto, forward: !!keys['KeyW'] || !!ti?.thrust, brake: !!keys['KeyS'] || !!ti?.brake,
+      left: !!keys['KeyA'], right: !!keys['KeyD'], boost: !!(keys['ShiftLeft'] || keys['ShiftRight']),
+      up: !!keys['Space'] || !!ti?.up, down: !!(keys['KeyC'] || keys['ControlLeft'] || keys['ControlRight']) || !!ti?.down });
     player.vy = 0; player.onGround = false;
   } else {
     // Sprinten bricht Ducken / Liegen automatisch ab (taktischer Stand-Sprint)
@@ -1856,11 +2235,6 @@ function update(dt){
   if(comboT>0){ comboT-=dt; if(comboT<=0){ combo=1; } }
   ui.combo.textContent='COMBO x'+combo; ui.combo.classList.toggle('on', combo>=2);
 
-  // Pickups (Karotten drehen + einsammeln = heilen)
-  for(let i=pickups.length-1;i>=0;i--){ const p=pickups[i]; p.rotation.y+=dt*1.5;
-    if(p.position.distanceTo(camera.position)<1.6){ player.hp=Math.min(player.maxHp,player.hp+25); updateHealth();
-      audio.pickup(); scene.remove(p); pickups.splice(i,1); showPop('+25 ❤',false); } }
-
   // Feinde
   let alive=0;
   for(let i=enemies.length-1;i>=0;i--){
@@ -1986,13 +2360,15 @@ function update(dt){
   }
   // Welle geschafft? (nur Solo — im Mehrspieler keine KI-Wellen)
   if(state==='playing' && !mpActive && alive===0 && aliveTarget<=0){ startWave(); }
-  if(net.connected) mpUpdate(dt);
+  if (gameMode === 'explore' && explore.active) explore.update(dt, camera.position, yaw);
+  if (gameMode === 'explore') flyUpdate(dt);
+  if(net.connected) { if (exploreTeam) exploreNetUpdate(dt); else mpUpdate(dt); }
 
   // Munitionskisten: auftauchen lassen, drehen, einsammeln
   {
     const w = arsenal.currentWeapon, a = arsenal.ammo;
     const lowAmmo = Boolean(w && !w.melee && a.reserve < a.magSize);
-    crates.update(dt, camera.position, camera.position.y - player.height, state === 'playing' && !mpActive, lowAmmo);
+    crates.update(dt, camera.position, camera.position.y - player.height, state === 'playing' && !mpActive && gameMode !== 'explore', lowAmmo);
   }
 
   // FX updaten (Pools — nichts wird alloziert/disposed)
@@ -2019,8 +2395,23 @@ function update(dt){
 }
 
 function gameOver(){
-  state='over'; document.exitPointerLock(); setOverlay();
-  broom.reset();
+  const ex = gameMode === 'explore' && explore.active;
+  const exResult = ex ? { score: explore.score, count: explore.count, total: explore.total, time: explore.time, complete: explore.complete } : null;
+  state='over'; document.exitPointerLock?.(); setOverlay();
+  broom.reset(); resetFly();
+  if (ex) {
+    score = exResult.score;
+    explore.stop(); document.body.classList.remove('explore');
+    if (exploreTeam || net.connected) { net.disconnect(); clearRemotes(); exploreTeam = false; }
+    ui.finalScore.textContent = score.toLocaleString('de-DE');
+    $('gameOverTitle').textContent = exResult.complete ? 'ALLE ORTE ENTDECKT!' : 'FLUG BEENDET';
+    const t = Math.round(exResult.time);
+    $('finalKillsLine').textContent = `📍 ${exResult.count} von ${exResult.total} Orten · ⏱ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    ui.record.textContent = '';
+    showHighscoreBox(exResult.count);
+    return;
+  }
+  $('finalKillsLine').innerHTML = FINAL_KILLS_HTML;
   ui.finalScore.textContent=score;
   const isZ = (gameMode === 'zombies');
   const finalKillsEl = $('finalKills');
@@ -2039,36 +2430,50 @@ function gameOver(){
 // ----------------------------------------------------------------------------
 // Bestenliste (online, je Karte und Modus; Server: server/src/highscores.ts)
 // ----------------------------------------------------------------------------
+const FINAL_KILLS_HTML = $('finalKillsLine')?.innerHTML || '';
 const mapName = (id) => (MAP_CONFIGS.find(m => m.id === id) || {}).name || id;
-const modeName = (m) => (m === 'zombies' ? 'Zombies' : 'Söldner');
+const modeName = (m) => (m === 'zombies' ? 'Zombies' : m === 'explore' ? 'Erkundungsflug' : 'Söldner');
 let hsPending = null;          // Ergebnis der letzten Runde, das noch eingetragen werden kann
 
-function showHighscoreBox(){
-  const mode = gameMode === 'zombies' ? 'zombies' : 'classic';
-  hsPending = score > 0 ? { map: currentMapId, mode, score, kills, wave } : null;
+/** found = entdeckte Orte (nur Erkundungsflug; steht in der Liste im Feld wave). */
+function showHighscoreBox(found = 0){
+  const mode = gameMode === 'zombies' ? 'zombies' : gameMode === 'explore' ? 'explore' : 'classic';
+  hsPending = score > 0 ? (mode === 'explore' ? { map: currentMapId, mode, score, kills: 0, wave: found } : { map: currentMapId, mode, score, kills, wave }) : null;
   $('hsBoard').textContent = mapName(currentMapId) + ' · ' + modeName(mode);
   $('hsName').value = localStorage.getItem('rod.name') || '';
   $('hsForm').style.display = hsPending ? 'flex' : 'none';
   $('hsList').replaceChildren();
   $('hsMsg').textContent = 'Lade Bestenliste …';
+  $('hsLogin').style.display = 'none';
+  if (hsPending && !auth.signedIn) {                    // Eintragen nur mit Google-Anmeldung
+    $('hsForm').style.display = mode === 'explore' ? 'none' : 'flex';
+    showHsLogin('Zum Eintragen in die Bestenliste mit Google anmelden. In der Liste steht nur dein Spielname.');
+  } else if (mode === 'explore' && hsPending && $('hsName').value.trim()) { submitHighscore(); return; }   // Name steht schon fest
   fetchTop(currentMapId, mode)
-    .then(d => { renderTop($('hsList'), d.top); $('hsMsg').textContent = d.top.length ? '' : 'Noch keine Einträge – trag dich als Erster ein!'; })
+    .then(d => { renderTop($('hsList'), d.top, null, mode); $('hsMsg').textContent = d.top.length ? '' : 'Noch keine Einträge – trag dich als Erster ein!'; })
     .catch(() => { $('hsMsg').textContent = 'Bestenliste gerade nicht erreichbar.'; $('hsForm').style.display = 'none'; });
 }
 
+function showHsLogin(note){
+  $('hsLogin').style.display = 'flex';
+  loginBox($('hsLogin'), { note, onDone: () => { $('hsLogin').style.display = 'none'; submitHighscore(); } });
+}
 async function submitHighscore(){
   if (!hsPending) return;
-  const name = $('hsName').value.trim().slice(0, 16) || 'Hase';
+  if (!auth.signedIn) { showHsLogin('Zum Eintragen in die Bestenliste mit Google anmelden. In der Liste steht nur dein Spielname.'); return; }
+  const name = $('hsName').value.trim().slice(0, 16) || 'Flieger';
   localStorage.setItem('rod.name', name);
   $('hsSubmit').disabled = true;
   $('hsMsg').textContent = 'Wird eingetragen …';
   try {
-    const r = await submitScore({ name, ...hsPending });
+    const r = await submitScore({ name, ...hsPending, idToken: auth.token });
+    const mode = hsPending.mode;
     hsPending = null;
     $('hsForm').style.display = 'none';
-    renderTop($('hsList'), r.top, r.rank);
+    renderTop($('hsList'), r.top, r.rank, mode);
     $('hsMsg').textContent = !r.rank ? 'Eingetragen.' : (r.rank <= 10 ? `🏆 Platz ${r.rank}!` : `Platz ${r.rank} – knapp an den Top 10 vorbei.`);
   } catch (err) {
+    if (/401/.test(err.message)) { auth.signOut(); showHsLogin('Die Anmeldung ist abgelaufen – bitte noch einmal mit Google anmelden.'); $('hsMsg').textContent = ''; return; }
     $('hsMsg').textContent = /429/.test(err.message) ? 'Bitte kurz warten und noch einmal versuchen.' : 'Eintragen hat nicht geklappt (Server nicht erreichbar).';
   } finally {
     $('hsSubmit').disabled = false;
@@ -2082,12 +2487,12 @@ function openHighscoreModal(){
   $('hsModalMap').textContent = mapName(currentMapId);
   $('hsModal').style.display = 'flex';
   $('hsModalMsg').textContent = 'Lade …';
-  const lists = { classic: $('hsListClassic'), zombies: $('hsListZombies') };
+  const lists = { classic: $('hsListClassic'), zombies: $('hsListZombies'), explore: $('hsListExplore') };
   let failed = 0;
-  for (const mode of (SOELDNER_SICHTBAR ? ['classic', 'zombies'] : ['zombies'])) {
+  for (const mode of (SOELDNER_SICHTBAR ? ['classic', 'zombies', 'explore'] : ['zombies', 'explore'])) {
     lists[mode].replaceChildren();
     fetchTop(currentMapId, mode)
-      .then(d => { renderTop(lists[mode], d.top); if (!d.top.length) lists[mode].innerHTML = '<li class="empty">Noch keine Einträge</li>'; })
+      .then(d => { renderTop(lists[mode], d.top, null, mode); if (!d.top.length) lists[mode].innerHTML = '<li class="empty">Noch keine Einträge</li>'; })
       .catch(() => { failed++; })
       .finally(() => { $('hsModalMsg').textContent = failed ? 'Bestenliste gerade nicht erreichbar.' : ''; });
   }
@@ -2100,6 +2505,7 @@ $('hsModal').addEventListener('click', e => { e.stopPropagation(); if (e.target.
 // Taktisches Map-Radar (UAV)
 // ----------------------------------------------------------------------------
 const radarCanvas = $('radarCanvas');
+const RADAR_RANGE_EXPLORE = 250;   // m bis zum Rand im Erkundungsflug
 const radarCtx = radarCanvas ? radarCanvas.getContext('2d') : null;
 let radarSweep = 0;
 
@@ -2150,10 +2556,9 @@ function updateRadar(dt) {
   radarCtx.fill();
   radarCtx.restore();
 
-  // Nord-Markierung (rotiert gegen Spieler-Blickrichtung yaw)
-  const northAngle = -yaw;
-  const nx = cx + Math.sin(northAngle) * (radius - 8);
-  const ny = cy - Math.cos(northAngle) * (radius - 8);
+  // Nord-Markierung: Norden (-z) im Blickrahmen (vorne = oben). Blick nach Westen → Norden rechts.
+  const nx = cx + Math.sin(yaw) * (radius - 8);
+  const ny = cy - Math.cos(yaw) * (radius - 8);
   radarCtx.fillStyle = '#7ef0c0';
   radarCtx.font = 'bold 9px monospace';
   radarCtx.textAlign = 'center';
@@ -2161,11 +2566,13 @@ function updateRadar(dt) {
   radarCtx.fillText('N', nx, ny);
 
   // Feinde / Zombies auf Radar zeichnen
-  const isZ = (gameMode === 'zombies');
-  const radarRange = 65; // 65 Meter Radius
+  const isZ = (gameMode === 'zombies'), isE = (gameMode === 'explore');
+  const radarRange = isE ? RADAR_RANGE_EXPLORE : 65;   // Meter bis zum Rand (beim Fliegen viel weiter)
   const scale = (radius - 6) / radarRange;
-  const sinY = Math.sin(-yaw);
-  const cosY = Math.cos(-yaw);
+  // Welt → Radar: x = Abstand · rechts, y = −Abstand · vorne (vorne = oben). Früher mit −yaw, das spiegelte
+  // alles, sobald man nicht genau nach Norden oder Süden schaute.
+  const sinY = Math.sin(yaw);
+  const cosY = Math.cos(yaw);
 
   for (const e of enemies) {
     if (e.dead) continue;
@@ -2204,6 +2611,57 @@ function updateRadar(dt) {
     if (d > maxR) { px = cx + (px - cx) / d * maxR; py = cy + (py - cy) / d * maxR; }
     radarCtx.fillStyle = '#ffd24a';
     radarCtx.fillRect(px - 3.5, py - 3.5, 7, 7);
+  }
+
+  // Erkundungsflug: offene Orte (gold) und die Mitflieger (blau, mit Namen). Außer Reichweite: blasser am Rand,
+  // zeigt die Richtung. ▲/▼ = deutlich höher/tiefer, Ring = Schild an.
+  if (isE) {
+    const toRadar = (dx, dz) => {
+      let px = cx + (dx * cosY - dz * sinY) * scale, py = cy + (dx * sinY + dz * cosY) * scale;
+      const d = Math.hypot(px - cx, py - cy), maxR = radius - 6, out = d > maxR;
+      if (out) { px = cx + (px - cx) / d * maxR; py = cy + (py - cy) / d * maxR; }
+      return { px, py, out };
+    };
+    explore.forEachOpen((p) => {
+      const r = toRadar(p.x - camera.position.x, p.z - camera.position.z);
+      radarCtx.fillStyle = r.out ? 'rgba(255,204,64,0.4)' : (p.tip ? '#4fd2ff' : '#ffcc40');
+      radarCtx.beginPath();
+      radarCtx.moveTo(r.px, r.py - 3); radarCtx.lineTo(r.px + 3, r.py); radarCtx.lineTo(r.px, r.py + 3); radarCtx.lineTo(r.px - 3, r.py);
+      radarCtx.closePath(); radarCtx.fill();
+    });
+    if (exploreTeam && net.connected) {
+      const labels = [];                                 // schon belegte Namensfelder (nicht übereinander schreiben)
+      radarCtx.font = 'bold 9px system-ui, sans-serif';
+      radarCtx.textBaseline = 'middle';
+      radarCtx.lineWidth = 3;
+      radarCtx.lineJoin = 'round';
+      for (const [id, a] of remoteAvatars) {
+        const p = net.getPlayer(id); if (!p) continue;
+        const r = toRadar(a.g.position.x - camera.position.x, a.g.position.z - camera.position.z);
+        radarCtx.save();
+        radarCtx.globalAlpha = r.out ? 0.65 : 1;
+        radarCtx.fillStyle = '#5fd0ff';
+        radarCtx.shadowColor = '#5fd0ff';
+        radarCtx.shadowBlur = 6;
+        radarCtx.beginPath(); radarCtx.arc(r.px, r.py, 4, 0, Math.PI * 2); radarCtx.fill();
+        radarCtx.shadowBlur = 0;
+        if (p.sh) { radarCtx.strokeStyle = '#9fe0ff'; radarCtx.lineWidth = 1.5; radarCtx.beginPath(); radarCtx.arc(r.px, r.py, 7, 0, Math.PI * 2); radarCtx.stroke(); radarCtx.lineWidth = 3; }
+        const dy = p.y - camera.position.y;
+        const label = (p.name || '').slice(0, 9) + (dy > 8 ? ' ▲' : dy < -8 ? ' ▼' : '');
+        const left = r.px > cx + 18;                     // rechts vom Punkt, am rechten Rand links davon
+        radarCtx.textAlign = left ? 'right' : 'left';
+        const tx = r.px + (left ? -7 : 7), tw = radarCtx.measureText(label).width;
+        const x0 = left ? tx - tw : tx;
+        let ty = r.py;
+        for (let k = 0; k < 4 && labels.some((b) => Math.abs(b.y - ty) < 10 && x0 < b.x1 && x0 + tw > b.x0); k++) ty += ty > cy ? -10 : 10;
+        labels.push({ x0, x1: x0 + tw, y: ty });
+        radarCtx.strokeStyle = 'rgba(4,10,14,0.9)';
+        radarCtx.strokeText(label, tx, ty);
+        radarCtx.fillStyle = '#d6f2ff';
+        radarCtx.fillText(label, tx, ty);
+        radarCtx.restore();
+      }
+    }
   }
 
   // Navi: Route + Ziel (gleiche Drehung wie die Gegnerpunkte)
@@ -2265,41 +2723,37 @@ function toggleMusic() {
 }
 
 function setGameMode(mode) {
-  if (!SOELDNER_SICHTBAR) mode = 'zombies';            // Söldner ausgeblendet: immer Zombie-Überleben
-  gameMode = (mode === 'zombies') ? 'zombies' : 'classic';
+  if (!MODES_OK.includes(mode)) mode = 'zombies';
+  if (TOUCH || !KAMPF_SICHTBAR) mode = 'explore';      // Handy oder ohne Kampfmodi: nur Erkundungsflug
+  gameMode = mode;
   localStorage.setItem('rod.gameMode', gameMode);
 
-  const isZ = (gameMode === 'zombies');
-  const classicBtn = $('modeClassicBtn');
-  const zombiesBtn = $('modeZombiesBtn');
+  const isZ = (gameMode === 'zombies'), isE = (gameMode === 'explore');
   const modeDesc = $('modeDescription');
   const radarBadge = $('radarModeBadge');
   const pauseModeBtn = $('pauseModeBtn');
   const gameOverModeBtn = $('gameOverModeBtn');
-
-  if (classicBtn && zombiesBtn) {
-    if (isZ) {
-      zombiesBtn.style.border = '2px solid #ff4d6d';
-      zombiesBtn.style.background = 'rgba(60,18,26,0.95)';
-      zombiesBtn.style.boxShadow = '0 0 16px rgba(255,77,109,0.4)';
-      classicBtn.style.border = '1px solid rgba(255,255,255,0.2)';
-      classicBtn.style.background = 'rgba(16,22,28,0.7)';
-      classicBtn.style.boxShadow = 'none';
-      if (modeDesc) modeDesc.innerHTML = '🧟 <b>Zombie-Überleben:</b> Wilde gefräßige Horden jagen dich! Sie sind etwas langsamer als dein Gehen/Sprinten.';
-      if (modeDesc) modeDesc.style.color = '#ff6b8b';
-    } else {
-      classicBtn.style.border = '2px solid #7ef0c0';
-      classicBtn.style.background = 'rgba(26,54,46,0.95)';
-      classicBtn.style.boxShadow = '0 0 16px rgba(126,240,192,0.3)';
-      zombiesBtn.style.border = '1px solid rgba(255,255,255,0.2)';
-      zombiesBtn.style.background = 'rgba(24,12,16,0.7)';
-      zombiesBtn.style.boxShadow = 'none';
-      if (modeDesc) modeDesc.innerHTML = '🛡️ <b>Klassisch: Söldner:</b> Taktische Gefechte gegen bewaffnete Söldner in Deckung.';
-      if (modeDesc) modeDesc.style.color = '#7ef0c0';
-    }
+  const styles = {                                     // Knopf → [aktiv?, Rahmenfarbe, Hintergrund aktiv, Leuchten]
+    modeClassicBtn: [gameMode === 'classic', '#7ef0c0', 'rgba(26,54,46,0.95)', 'rgba(126,240,192,0.3)'],
+    modeZombiesBtn: [isZ, '#ff4d6d', 'rgba(60,18,26,0.95)', 'rgba(255,77,109,0.4)'],
+    modeExploreBtn: [isE, '#ffcc40', 'rgba(60,50,14,0.95)', 'rgba(255,204,64,0.4)'],
+  };
+  for (const [id, [on, col, bg, glow]] of Object.entries(styles)) {
+    const btn = $(id); if (!btn) continue;
+    btn.style.border = on ? `2px solid ${col}` : '1px solid rgba(255,255,255,0.2)';
+    btn.style.background = on ? bg : 'rgba(16,22,28,0.7)';
+    btn.style.boxShadow = on ? `0 0 16px ${glow}` : 'none';
+  }
+  if (modeDesc) {
+    modeDesc.innerHTML = isE ? (TOUCH
+      ? '🧹 <b>Erkundungsflug:</b> Handy quer halten. Neigen lenkt, rechts Schub, links hoch/runter.'
+      : '🧹 <b>Erkundungsflug:</b> Ohne Gegner auf dem Besen Orte entdecken – allein oder im Team.')
+      : isZ ? '🧟 <b>Zombie-Überleben:</b> Wilde gefräßige Horden jagen dich! Sie sind etwas langsamer als dein Gehen/Sprinten.'
+        : '🛡️ <b>Klassisch: Söldner:</b> Taktische Gefechte gegen bewaffnete Söldner in Deckung.';
+    modeDesc.style.color = isE ? '#ffd86b' : isZ ? '#ff6b8b' : '#7ef0c0';
   }
 
-  if (radarBadge) radarBadge.textContent = isZ ? 'Z-RADAR' : 'RADAR';
+  if (radarBadge) radarBadge.textContent = isZ ? 'Z-RADAR' : isE ? `${RADAR_RANGE_EXPLORE} M` : 'RADAR';
   if (pauseModeBtn) pauseModeBtn.textContent = isZ ? '🎮 Modus: 🧟 ZOMBIES' : '🎮 Modus: 🛡️ SÖLDNER';
   if (gameOverModeBtn) gameOverModeBtn.textContent = isZ ? '🎮 Modus: 🧟 ZOMBIES' : '🎮 Modus: 🛡️ SÖLDNER';
 
@@ -2318,6 +2772,8 @@ function setupGameModeAndMusicListeners() {
   $('startMusicBtn')?.addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
   $('modeClassicBtn')?.addEventListener('click', (e) => { e.stopPropagation(); setGameMode('classic'); });
   $('modeZombiesBtn')?.addEventListener('click', (e) => { e.stopPropagation(); setGameMode('zombies'); });
+  $('modeExploreBtn')?.addEventListener('click', (e) => { e.stopPropagation(); setGameMode('explore'); });
+  $('pauseFinishBtn')?.addEventListener('click', (e) => { e.stopPropagation(); finishExplore(); });
   $('pauseModeBtn')?.addEventListener('click', (e) => {
     e.stopPropagation();
     setGameMode(gameMode === 'zombies' ? 'classic' : 'zombies');
@@ -2331,21 +2787,50 @@ function setupGameModeAndMusicListeners() {
     restart();
   });
   if (!SOELDNER_SICHTBAR) {
-    // Nur Zombie-Überleben: Modus-Wahl, Umschalter und die Söldner-Spalte der Bestenliste ausblenden
-    for (const id of ['modeHeader', 'modeButtons', 'pauseModeBtn', 'gameOverModeBtn']) {
+    // Söldner ausgeblendet: Zombies und Erkundungsflug zur Wahl; Umschalter (Söldner ↔ Zombies) und Söldner-Spalte weg
+    for (const id of ['modeClassicBtn', 'pauseModeBtn', 'gameOverModeBtn']) {
       const el = $(id);
       if (el) el.style.display = 'none';
     }
     const col = $('hsListClassic')?.parentElement;
-    if (col) { col.style.display = 'none'; col.parentElement.style.gridTemplateColumns = '1fr'; }
+    if (col) { col.style.display = 'none'; col.parentElement.style.gridTemplateColumns = '1fr 1fr'; }
+  }
+  if (!KAMPF_SICHTBAR) {
+    // Nur Flying Much: keine Modus-Wahl, keine Waffen, kein Deathmatch; Bestenliste nur Erkundungsflug
+    for (const id of ['modeHeader', 'modeClassicBtn', 'modeZombiesBtn', 'mpBtn', 'armoryBtn', 'pauseArmoryBtn', 'gameOverArmoryBtn', 'pauseModeBtn', 'gameOverModeBtn']) {
+      const el = $(id); if (el) el.style.display = 'none';
+    }
+    for (const id of ['hsListClassic', 'hsListZombies']) { const col = $(id)?.parentElement; if (col) col.style.display = 'none'; }
+    const cols = $('hsListExplore')?.parentElement?.parentElement; if (cols) cols.style.gridTemplateColumns = '1fr';
+    const grid = $('pauseControls')?.querySelector('.ctrlGrid');
+    if (grid) grid.innerHTML = '<span>Schub</span><b>W / Maus 3</b><span>Lenken</span><b>Maus</b><span>Bremsen</span><b>S</b>'
+      + '<span>Steigen / Sinken</span><b>Leertaste / C</b><span>Seitlich</span><b>A / D</b><span>Spirale</span><b>Mausrad</b>'
+      + '<span>Karte &amp; Navi</span><b>N / Tab</b><span>Musik an/aus</span><b>M</b><span>Pause</span><b>ESC</b>';
+    const hint = ui.start.querySelector('.hint.pulse');
+    if (hint) hint.textContent = 'Klicke auf „Losfliegen“ – die Maus wird eingefangen';
+    const solo = $('soloPlayBtn'); if (solo) solo.textContent = '▶ Losfliegen';
+    const again = ui.gameover.querySelector('[data-act="restart"]'); if (again) again.textContent = '↻ Neuer Flug';
+  }
+  if (TOUCH) {
+    // Handy: nur Erkundungsflug, kein Deathmatch im LAN, Hinweis ohne Maus
+    for (const id of ['modeZombiesBtn', 'mpBtn', 'armoryBtn']) { const el = $(id); if (el) el.style.display = 'none'; }
+    const hint = ui.start.querySelector('.hint.pulse');
+    if (hint) hint.textContent = 'Tippe auf „' + ($('soloPlayBtn')?.textContent.replace(/^▶\s*/, '') || 'Losfliegen') + '“ – Handy quer halten';
   }
 }
 
 // ----------------------------------------------------------------------------
 // Karte & Navi (Taste N / Tab): Ziel setzen, Route folgen
 // ----------------------------------------------------------------------------
-nav = new NavMap({ scene, obstacles, getBounds: getMapBounds, groundAt: (x, z) => groundAt(x, z), getEnemies: () => enemies, banner: showBanner });
+nav = new NavMap({ scene, obstacles, getBounds: getMapBounds, groundAt: (x, z) => groundAt(x, z), getEnemies: () => enemies, banner: showBanner,
+  getFriends: friendList, ceilingAt: (x, z) => ceilingAt(x, z), isAutopilot: () => ap.on, touch: TOUCH });
 nav.onRequestClose = (mode) => closeNavMap(mode);
+/** Knopf „Autopilot“ in der Mitflieger-Liste: einschalten und zurück ins Spiel (beim selben Ziel: ausschalten). */
+nav.onAutopilot = (id) => {
+  if (ap.on && nav.friend?.id === id) { autopilotOff('key'); return; }
+  if (nav.friend?.id !== id && !nav.setFriend(id, camera.position)) return;
+  if (autopilotOn()) closeNavMap('resume');
+};
 function openNavMap(){
   state = 'map'; setOverlay();
   nav.open(camera.position);
@@ -2360,7 +2845,12 @@ function navMapKey(e){
   if (e.code === 'KeyN' || e.code === 'Tab') { e.preventDefault(); closeNavMap('resume'); }
   else if (e.code === 'Escape') closeNavMap('pause');
   else if (e.code === 'Space') { e.preventDefault(); nav.center(camera.position); }
-  else if (e.code === 'Delete' || e.code === 'Backspace') nav.clearMarker();
+  else if (e.code === 'Delete' || e.code === 'Backspace') nav.clearAll();
+  else if (/^Digit[1-9]$/.test(e.code)) nav.pickFriend(+e.code.slice(5) - 1, camera.position);   // Mitflieger 1–9
+  else if (e.code === 'KeyP' && gameMode === 'explore' && !e.repeat) {
+    if (ap.on) autopilotOff('key');
+    else if (autopilotOn()) closeNavMap('resume');
+  }
 }
 document.addEventListener('pointerlockerror', () => { if (state === 'map') { state = 'paused'; setOverlay(); showPauseButtons(); } });
 
@@ -2388,6 +2878,8 @@ function frame(now){
   if (mapTick) mapTick(camera);
   if (state === 'playing') nav.update(dt, camera.position, yaw);
   if (nav.isOpen) nav.draw(camera.position, yaw);
+  const naviOn = nav.hud.style.display === 'flex';           // Navi-Hinweis oben: Besen-Hilfetext darunter ausblenden
+  if (naviOn !== document.body.classList.contains('navi-on')) document.body.classList.toggle('navi-on', naviOn);
   renderFrame();
 }
 function renderFrame(){
@@ -2395,7 +2887,7 @@ function renderFrame(){
   try {
     renderer.clear();
     renderer.render(scene, camera);
-    if (!broom.active) arsenal.render(renderer);    // auf dem Besen halten die Hände den Besen (Bild), keine Waffe
+    if (!broom.active && !TOUCH && KAMPF_SICHTBAR) arsenal.render(renderer);   // Besen: Hände halten den Besen (Bild); Handy/ohne Kampf: nie Waffen
   } finally { gpuTimerEnd(q); }
   adaptResolution();
 }
@@ -2656,13 +3148,11 @@ function setupArmoryUI() {
   $('armoryCloseBtn')?.addEventListener('click', closeArmory);
   $('armoryEquipBtn')?.addEventListener('click', () => {
     closeArmory();
-    audio.ensure();
-    lock();
+    if (state === 'ready') startClick(); else { audio.ensure(); lock(); }
   });
   $('soloPlayBtn')?.addEventListener('click', (ev) => {
     ev.stopPropagation();
-    audio.ensure();
-    lock();
+    startClick();
   });
 }
 
@@ -2792,9 +3282,15 @@ async function bootUp(){
       console.warn('Arsenal init:', e);
     }
 
-    boot.say('Soldaten-Gegner laden…'); boot.prog(0.7);
+    boot.say(KAMPF_SICHTBAR ? 'Soldaten-Gegner laden…' : 'Mitflieger laden…'); boot.prog(0.7);
+    const gltfLoader = new GLTFLoader();
     try {
-      const gltfLoader = new GLTFLoader();
+      flyerTemplate = await loadFlyerTemplate(gltfLoader, { minigun: MINIGUN_AN });
+      console.log('✅ Mitflieger (Soldat auf dem Besen) geladen:', flyerTemplate.animations.map(a => a.name).join(', '));
+    } catch (e) {
+      console.warn('Mitflieger-Modell nicht ladbar – Ersatzfigur:', e);
+    }
+    if (KAMPF_SICHTBAR) try {                         // Soldaten-Gegner und Deathmatch-Gegner (Soldier.glb)
       const gltf = await gltfLoader.loadAsync('assets/models/soldier/Soldier.glb');
       gltf.scene.traverse(o => {
         if (o.isMesh) {
@@ -2812,15 +3308,15 @@ async function bootUp(){
       console.warn('Soldier model fallback:', e);
     }
 
-    boot.say('Zombies laden…'); boot.prog(0.8);
-    try {
+    boot.say(KAMPF_SICHTBAR ? 'Zombies laden…' : 'Muchtown vorbereiten…'); boot.prog(0.8);
+    if (KAMPF_SICHTBAR) try {
       zombieTemplate = await loadZombieTemplate();
       console.log('✅ Zombie-Modell geladen:', [...zombieTemplate.clips.keys()].join(', '), `(${zombieTemplate.skins.length} Hautvarianten)`);
     } catch (e) {
       console.warn('Zombie-Modell nicht gefunden – Ersatz-Zombies. Anleitung: README, Abschnitt „Zombie-Modell“.', e.message);
     }
 
-    boot.say('Waffenkammer & Karten vorbereiten…'); boot.prog(0.9);
+    boot.say(KAMPF_SICHTBAR ? 'Waffenkammer & Karten vorbereiten…' : 'Karten vorbereiten…'); boot.prog(0.9);
     setupArmoryUI();
     setupMapUI();
     await new Promise(r=>setTimeout(r, 80));
@@ -2924,6 +3420,12 @@ function makeAvatar(){
   scene.add(g);
   return { g, hitbox, mixer, idleAction, walkAction, current: 'idle', ownMats };
 }
+/** Mitflieger im Erkundungsflug: Soldat auf dem Besen mit Animationen und Schild (src/flyer.js). */
+function makeFlyerAvatar(){
+  const f = createFlyer(flyerTemplate);
+  scene.add(f.g);
+  return { g: f.g, hitbox: new THREE.Object3D(), flyer: f, mixer: null, ownMats: f.ownMats };   // hitbox nur der Form halber
+}
 function clearRemotes(){
   for(const [,a] of remoteAvatars) {
     if (a.mixer) a.mixer.stopAllAction();
@@ -2939,18 +3441,26 @@ function syncRemote(dt){
   players.forEach((p, id)=>{
     if(id===net.sessionId) return;
     let a = remoteAvatars.get(id);
-    if(!a){ a = makeAvatar(); a.hitbox.userData.remoteId=id; a.g.position.set(p.x,0,p.z); remoteAvatars.set(id,a); remoteHitboxes.push(a.hitbox); }
+    if(!a){ a = exploreTeam && flyerTemplate ? makeFlyerAvatar() : makeAvatar(); a.hitbox.userData.remoteId=id;
+      a.g.position.set(p.x, exploreTeam ? p.y - (a.flyer ? FLYER_HEAD : 1.6) : 0, p.z); remoteAvatars.set(id,a); remoteHitboxes.push(a.hitbox);
+      if (exploreTeam) decorateFlyer(a); }
     const prevX = a.g.position.x, prevZ = a.g.position.z;
     const k = Math.min(1, dt*12);                          // sanftes Nachziehen der Netz-Position
     a.g.position.x += (p.x - a.g.position.x)*k;
     a.g.position.z += (p.z - a.g.position.z)*k;
-    a.g.position.y = Math.max(0, p.y - 1.6);               // Server-y ist Augenhöhe (1.6); Avatar steht am Boden
+    a.g.position.y = exploreTeam ? a.g.position.y + (p.y - (a.flyer ? FLYER_HEAD : 1.6) - a.g.position.y) * k   // Flug: echte Höhe (auch unter 0)
+      : Math.max(0, p.y - 1.6);                            // Server-y ist Augenhöhe (1.6); Avatar steht am Boden
+    if (a.flyer) {                                         // Besen-Flieger: Drehung, Animationen, Schild, Minigun (flyer.js)
+      a.flyer.update(dt, p);
+      if (a.flyer.firing) { a.mgT = (a.mgT || 0) - dt; if (a.mgT <= 0) { a.mgT += 1 / 12; remoteMgShot(a, p); } } else a.mgT = 0;
+      return;
+    }
     a.g.rotation.y = p.ry;
     a.g.visible = !p.dead;
 
     if (a.mixer) {
       a.mixer.update(dt);
-      const moved = Math.hypot(a.g.position.x - prevX, a.g.position.z - prevZ) > 0.005;
+      const moved = !exploreTeam && Math.hypot(a.g.position.x - prevX, a.g.position.z - prevZ) > 0.005;
       if (moved && a.current !== 'walk') {
         a.idleAction?.fadeOut(0.2);
         a.walkAction?.reset().fadeIn(0.2).play();
@@ -2973,6 +3483,124 @@ function syncRemote(dt){
     }
   }
 }
+/** Mitflieger im Erkundungsflug: Namensschild, das durch Wände sichtbar bleibt (der Besen steckt im Modell, flyer.js). */
+function decorateFlyer(a){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, sizeAttenuation: false, transparent: true });
+  const tag = new THREE.Sprite(mat); tag.scale.set(0.3, 0.056, 1); tag.position.y = a.flyer ? FLYER_HEAD + 0.75 : 2.7; tag.renderOrder = 999;
+  a.g.add(tag);
+  a.ownMats.push(mat);
+  a.tag = { c, tex, last: '' };
+}
+function drawTag(a, text){
+  if (!a.tag || a.tag.last === text) return;
+  const { c, tex } = a.tag, g = c.getContext('2d');
+  g.clearRect(0, 0, c.width, c.height);
+  g.font = '700 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const w = Math.min(c.width - 8, g.measureText(text).width + 40);
+  g.fillStyle = 'rgba(8,14,20,0.72)'; g.beginPath(); g.roundRect?.((c.width - w) / 2, 8, w, 80, 40); g.fill();
+  g.fillStyle = '#ffe7a0'; g.fillText(text, c.width / 2, 50, c.width - 30);
+  tex.needsUpdate = true; a.tag.last = text;
+}
+let exLastSend = 0, exTagT = 0;
+/** Erkundungsflug im Team: eigene Lage senden, Mitflieger nachziehen, Namensschilder mit Abstand. */
+function exploreNetUpdate(dt){
+  const now = performance.now();
+  if (now - exLastSend >= MP_MOVE_MS) {
+    exLastSend = now; const p = camera.position;
+    net.sendMove(p.x, p.y, p.z, yaw, false, {                // dazu, was die Figur bei den anderen zeigen soll
+      anim: broom.moving ? broom.anim : (fly.fidget || broom.anim), lean: Math.round(broom.lean * 20) / 20,
+      sh: fly.shOn, she: Math.round(fly.shE * 100) / 100,
+      mg: MINIGUN_AN && fly.mgFire && broom.active, pt: Math.round(pitch * 100) / 100 });
+  }
+  syncRemote(dt);
+  for (const a of remoteAvatars.values()) {                   // Fahrt der Mitflieger (für den Begleitflug des Autopiloten)
+    if (!a.vel) { a.vel = new THREE.Vector3(); a.prevP = a.g.position.clone(); continue; }
+    _apTv.subVectors(a.g.position, a.prevP).divideScalar(Math.max(dt, 1e-3));
+    a.vel.lerp(_apTv, 1 - Math.exp(-5 * dt)); a.prevP.copy(a.g.position);
+  }
+  exTagT -= dt;
+  if (exTagT <= 0) {
+    exTagT = 0.4;
+    for (const [id, a] of remoteAvatars) {
+      const p = net.getPlayer(id); if (!p) continue;
+      const d = Math.hypot(p.x - camera.position.x, p.z - camera.position.z, p.y - camera.position.y);
+      drawTag(a, `${p.name} · ${d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km'}`);
+    }
+  }
+}
+
+// ---------- Google-Anmeldung für die Bestenliste (src/auth.js) ----------
+/**
+ * Anmelde-Baustein in box: angemeldet → Hinweis + Abmelden; sonst ein eigener Knopf. Erst sein Klick lädt Googles
+ * Skript und zeigt dessen Knopf (zwei Klicks, vorher kein Kontakt zu Google). onDone nach erfolgreicher Anmeldung.
+ */
+function loginBox(box, { note, okText, onDone } = {}){
+  box.replaceChildren();
+  if (auth.signedIn) {
+    const ok = document.createElement('div'); ok.className = 'ok'; ok.textContent = okText || '✓ Mit Google angemeldet';
+    const out = document.createElement('a'); out.textContent = 'Abmelden';
+    out.addEventListener('click', (e) => { e.stopPropagation(); auth.signOut(); loginBox(box, { note, okText, onDone }); });
+    box.append(ok, out);
+    return;
+  }
+  const info = document.createElement('div'); info.textContent = note || 'Für die Bestenliste mit Google anmelden (freiwillig). In der Liste steht nur dein Spielname.';
+  const btn = document.createElement('button'); btn.className = 'btn'; btn.type = 'button'; btn.textContent = '🔐 Mit Google anmelden';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const slot = document.createElement('div');
+    const hint = document.createElement('div'); hint.textContent = 'Jetzt auf den Google-Knopf tippen:';
+    box.replaceChildren(hint, slot);
+    auth.button(slot, () => { loginBox(box, { note, okText, onDone }); onDone?.(); });
+  });
+  const priv = document.createElement('a'); priv.textContent = 'Datenschutz'; priv.href = './datenschutz.html'; priv.target = '_blank'; priv.rel = 'noopener';
+  priv.addEventListener('click', (e) => e.stopPropagation());
+  box.append(info, btn, priv);
+}
+
+// ---------- Erkundungsflug: Name, allein oder Team, Ende ----------
+function openExploreDialog(){
+  $('exName').value = localStorage.getItem('rod.name') || '';
+  $('exMsg').textContent = '';
+  loginBox($('exLogin'), { okText: '✓ Mit Google angemeldet – dein Ergebnis kommt am Ende in die Bestenliste' });
+  $('exploreDialog').style.display = 'flex';
+  if (!TOUCH) setTimeout(() => $('exName').focus(), 30);
+}
+function beginExplore(team){
+  const name = $('exName').value.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16);
+  if (!name) { $('exMsg').textContent = 'Bitte gib zuerst einen Namen ein.'; $('exName').focus(); return; }
+  localStorage.setItem('rod.name', name);
+  presence.setName(name);                              // wer bisher ohne Namen online war, wird jetzt angekündigt
+  audio.ensure();
+  if (TOUCH) touch.enable();                           // in der Geste: Sensor-Erlaubnis, Vollbild, Querformat
+  $('exploreDialog').style.display = 'none';
+  resetRun();
+  explore.setup(currentMapId, getMapBounds());
+  explore.start();
+  document.body.classList.add('explore');
+  if ($('broomHelp')) $('broomHelp').textContent = BROOM_HELP_EXPLORE;
+  lock();                                              // sofort (Pointer-Lock braucht die Klick-Geste), Team verbindet nebenher
+  if (team) {
+    exploreTeam = true;
+    showBanner('VERBINDE MIT DEM TEAM …');
+    net.connect(net.defaultUrl(), name, 'explore', { map: currentMapId })
+      .then(() => { if (!exploreTeam) { net.disconnect(); return; } exLastSend = 0; showBanner('IM TEAM – ' + (net.players ? net.players.size : 1) + ' AN BORD'); })
+      .catch((err) => { console.warn('[explore] Team-Server nicht erreichbar', err); exploreTeam = false; showBanner('TEAM-SERVER NICHT ERREICHBAR – DU FLIEGST ALLEIN'); });
+  }
+}
+/** Flug beenden (alle Orte gefunden oder über die Pause): Ergebnis und Bestenliste. */
+function finishExplore(){
+  if (gameMode !== 'explore' || !explore.active) return;
+  gameOver();
+}
+explore.onFound = (p) => { if (exploreTeam && net.connected) net.sendFound(p.id); };
+explore.onComplete = () => { if (state === 'playing' || state === 'paused') finishExplore(); };
+$('exSoloBtn').addEventListener('click', (e) => { e.stopPropagation(); beginExplore(false); });
+$('exTeamBtn').addEventListener('click', (e) => { e.stopPropagation(); beginExplore(true); });
+$('exBackBtn').addEventListener('click', (e) => { e.stopPropagation(); $('exploreDialog').style.display = 'none'; });
+$('exName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); beginExplore(false); } });
+
 function syncMyHealth(){
   const me = net.getPlayer(net.sessionId); if(!me) return;
   if(!mpSpawned){ camera.position.set(me.x, me.y, me.z); yaw=me.ry; mpSpawned=true; lastMyHp=me.hp; }  // einmaliger Spawn-Teleport
@@ -2992,16 +3620,21 @@ function mpUpdate(dt){
 
 net.on('shot', s=>{ const m=new THREE.Vector3(s.x,s.y,s.z).addScaledVector(new THREE.Vector3(s.dx,s.dy,s.dz),1.0); impact(m,'#ffd98a',6); audio.play('shot_rifle', { volume:0.7, pitch:0.95 }); })
    .on('killed', k=>{ if(k.victim===net.sessionId){ mpFrozen=true; showBanner('ELIMINIERT'); } else if(k.killer===net.sessionId){ showBanner('KILL!'); } })
-   .on('left', ()=>{ mpActive=false; $('mpStatus').textContent='Verbindung getrennt.'; clearRemotes(); })
-   .on('join', (id,p)=> showBanner(((p&&p.name)||'GEGNER')+' IST DA'))
-   .on('leave', ()=> showBanner('GEGNER WEG'));
+   .on('left', ()=>{
+     mpActive=false; $('mpStatus').textContent='Verbindung getrennt.'; clearRemotes();
+     if (exploreTeam) { exploreTeam = false; if (state === 'playing') showBanner('VERBINDUNG WEG – DU FLIEGST ALLEIN WEITER'); }
+   })
+   .on('join', (id,p)=> showBanner(((p&&p.name)||(exploreTeam?'MITSPIELER':'GEGNER')).toUpperCase()+' IST DA'))
+   .on('leave', ()=> showBanner(exploreTeam ? 'MITSPIELER WEG' : 'GEGNER WEG'))
+   .on('found', (id, by)=> { if (exploreTeam) explore.markFound(id, by); })
+   .on('fx', onFlyFx);
 
 $('mpBtn').addEventListener('click', async (ev)=>{
   ev.stopPropagation();                                   // nicht gleichzeitig Solo-Start auslösen
   if(mpActive || net.connected) return;
   const url = net.defaultUrl();
   $('mpStatus').textContent = 'Verbinde mit '+url+' …';
-  try { await net.connect(url, 'Hase'); }
+  try { await net.connect(url, localStorage.getItem('rod.name') || 'Spieler'); }
   catch(err){ console.error('[net] connect failed', err); $('mpStatus').textContent='Server nicht erreichbar — läuft server/ (npm start)?'; return; }
   mpActive=true; mpFrozen=false; mpSpawned=false; frags=0; lastMyHp=100;
   broom.reset();                       // Besen gibt es nur im Einzelspiel
@@ -3010,10 +3643,34 @@ $('mpBtn').addEventListener('click', async (ev)=>{
   $('mpStatus').textContent=''; audio.ensure(); lock();
 });
 
+// ---------- Wer ist online: Lobby, Beitritts-Meldungen, Besucherzähler (src/presence.js) ----------
+function showToast(text, kind){
+  const box = $('toasts'); if (!box) return;
+  const el = document.createElement('div'); el.className = 'toast' + (kind === 'leave' ? ' leave' : ''); el.textContent = text;
+  box.appendChild(el);
+  while (box.children.length > 4) box.firstChild.remove();
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 700); }, 5000);
+}
+const presence = createPresence({
+  url: net.defaultUrl(),
+  onToast: showToast,
+  onStats: ({ online, today, total }) => {
+    const de = (n) => n.toLocaleString('de-DE');
+    const txt = `🟢 ${de(online)} online · ${de(today)} heute · ${de(total)} gesamt`;
+    document.querySelectorAll('.presence-line').forEach((el) => { el.textContent = txt; });
+  },
+});
+setTimeout(() => presence.start(localStorage.getItem('rod.name') || ''), 1200);
+
 // Debug-Hook für Screenshot-Automatik & Tests
 window.__ROD__ = {
   camera, scene, renderer, arsenal, audio, music, player, damageFeedback, meleeAttack,
-  crates, gameOver, broom,
+  crates, gameOver, broom, explore, touch, net,
+  balls, fly, remoteAvatars, spit, shieldOn, get flyerTemplate(){return flyerTemplate;},
+  nav, ap, pilot, autopilotOn, autopilotOff, friendList, ceilingAt,
+  get exploreTeam(){return exploreTeam;},
+  get yaw(){return yaw;}, get pitch(){return pitch;},
+  get gameMode(){return gameMode;},
   get grenades(){return grenades;},
   get score(){return score;},
   set score(v){ score = v; updateScore(); },
@@ -3050,7 +3707,6 @@ window.__ROD__ = {
     document.getElementById('start').style.display='none';
     document.getElementById('banner').classList.remove('show');
     camera.position.set(4,1.7,20); camera.rotation.set(-0.05, Math.PI, 0, 'YXZ');
-    for(let i=pickups.length-1;i>=0;i--){ if(pickups[i].position.distanceTo(camera.position)<15){ scene.remove(pickups[i]); pickups.splice(i,1);} }
     makeEnemy(3,28); makeEnemy(-4,31); makeEnemy(9,33); makeEnemy(0,42);
     camera.updateMatrixWorld();
     arsenal.update(1/60, { speed: 0, grounded: true, sprinting: false, moving: false, aiming: false });
@@ -3062,7 +3718,7 @@ window.__ROD__ = {
 // Über DOM-Event auslösbar (Automations-evaluate läuft in isolierter Welt,
 // sieht window.__ROD__ nicht — das DOM aber schon).
 document.addEventListener('rod-demo', () => window.__ROD__.demo());
-document.addEventListener('rod-play', () => { state = 'playing'; setOverlay(); });
+document.addEventListener('rod-play', () => { state = 'playing'; setOverlay(); onPlayStart(); });
 document.addEventListener('rod-shoot', () => { arsenal.setTrigger(true); setTimeout(() => arsenal.setTrigger(false), 80); });
 document.addEventListener('rod-ads', () => { ads = !ads; });
 document.addEventListener('rod-reload', () => { arsenal.reload(); });

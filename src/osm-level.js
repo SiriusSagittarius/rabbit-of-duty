@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { pointInPoly, closestOnPoly } from './poly2d.js';
-import { buildNrwLevel } from './nrw-level.js?v=29';
+import { buildNrwLevel } from './nrw-level.js?v=30';
 import { makeLocalFrame } from './geo.js';
 
 /**

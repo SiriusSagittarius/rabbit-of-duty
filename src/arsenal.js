@@ -1,4 +1,4 @@
-// Waffen-Arsenal von Rabbit of Duty: eigene, aus Code gebaute Waffen (src/weapons/) mit Händen,
+// Waffen-Arsenal von Flying Much: eigene, aus Code gebaute Waffen (src/weapons/) mit Händen,
 // Animationen (Ziehen, Zielen, Nachladen), Rückstoßmuster, Magazinen, Mündungsfeuer und Zielfernrohr.
 // Die Schnittstelle (equip, switchSlot, setTrigger, reload, melee, update, render, currentWeapon, ammo …)
 // ist dieselbe wie beim früheren Arsenal, damit main.js kaum angepasst werden musste.

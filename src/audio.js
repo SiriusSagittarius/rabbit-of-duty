@@ -1,4 +1,4 @@
-// Audio-Manager fr Rabbit of Duty
+// Audio-Manager fr Flying Much
 // Ldt echte High-End-Audiodateien (WAV/MP3) als AudioBuffer vor
 // und bietet simultanes Abspielen mit Gain, Pitch-Variation & Fallback.
 

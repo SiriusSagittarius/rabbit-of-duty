@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { pointInPoly, closestOnPoly } from './poly2d.js';
-import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=11';
+import { MUCH_SHOPS, SHOP_TOP, drawShopAtlas, loadShopPhotos, shopPhotoOf } from './much-shops.js?v=12';
 import { buildMuchLandmarks, muchWallTextures } from './much-landmarks.js?v=1';
 
 /**
@@ -502,6 +502,14 @@ function clipBelow(q, ymin) {
 }
 
 /** Straßenniveau vor einer Front: Gelände 0,8 m vor der Wand an 9 Stellen. base = 35-%-Wert, bottom = tiefste Stelle. */
+/** Gebäude aufstocken: alle Punkte oberhalb des Fußpunkts um dh anheben (Wände länger, Dach höher). Nur einmal je Gebäude. */
+function raiseBuilding(b, dh) {
+  if (b.raisedBy) return;
+  const lim = b.y0 + 0.3;
+  for (const list of [b.w, b.r]) for (const p of list) for (let i = 1; i < p.length; i += 3) if (p[i] > lim) p[i] += dh;
+  b.y1 += dh; b.raisedBy = dh;
+}
+
 function streetLevel(F, H, y0) {
   const hs = [], a = F.u0 + 0.4, b = Math.max(a, F.u1 - 0.4), d = F.off + 0.8;
   for (let i = 0; i < 9; i++) { const u = a + (b - a) * i / 8; hs.push(H(F.rx * u + F.nx * d, F.rz * u + F.nz * d)); }
@@ -808,6 +816,7 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
     const t = tileAt((bb.minX + bb.maxX) / 2, (bb.minZ + bb.maxZ) / 2);
     const rng = U.mulberry32(seedOf(b.id || ''));
     const shop = shopOf(b);
+    if (shop?.raise) raiseBuilding(b, shop.raise);   // nach dem LoD2-Stand aufgestockt
     let floorY = b.y0;                       // Geschossraster ab hier; bei Läden ab dem Straßenniveau vor der Front
     if (shop) {
       const roads = roadsNamed(shop.street || b.street || 'Hauptstraße');   // Front zeigt zur eigenen Straße, nicht zur nächstbesten
@@ -824,7 +833,7 @@ export async function buildNrwLevel(ctx, loc, osm, U) {
         if (!photo && !spec.draw) return;                  // Wohnhaus nur mit Foto: ohne Foto keine Front
         let top = Math.min(SHOP_TOP, F.eave - 0.05 - lv.base + (spec.above || 0));   // above: Schild ragt über die Traufe
         if (full) for (const q of F.polys) for (let j = 1; j < q.length; j += 2) top = Math.max(top, q[j] - lv.base);
-        shopFronts.push({ shop: { name, draw: spec.draw, tint: spec.tint || shop.tint }, photo, front: F, base: lv.base,
+        shopFronts.push({ shop: { name, draw: spec.draw, tint: spec.tint || shop.tint }, photo, px: spec.px || shop.px, front: F, base: lv.base,
           plinth: lv.base - lv.bottom, width: F.u1 - F.u0, top, full, eave: F.eave - lv.base });
       });
     }

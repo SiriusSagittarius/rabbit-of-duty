@@ -5,18 +5,21 @@
 //   A / D                           seitlich       Leertaste  steigen    C oder Strg  sinken
 //   Mausrad hoch / runter           Spirale nach vorne / nach hinten (Rolle mit kurzem Satz)
 //   Maus 1                          Zauber (Treffer-Strahl wie bei den Waffen, siehe hitscanShot in main.js)
+//   Shift                           Boost (schneller)
+// Manöver (Tasten in main.js): Looping, Fassrolle, Steilspirale, Trick – die Kurven stehen in flight-moves.js,
+// damit die Mitflieger auf dem anderen Rechner dieselbe Bewegung sehen (flyer.js).
 // Die Ich-Ansicht ist das Bild des Users (ui/besen.webp), das Fluggeräusch seine Datei audio/blow.mp3.
 // Zauber, Spirale und Auf-/Absteigen sind kleine Synthesizer-Töne. Gebäude und Bäume halten die vorhandene
 // Kollision auf (main.js collide, mit Ober- und Unterkante). Über Dächer fliegt man einfach hinweg.
 import * as THREE from 'three';
+import { MOVE_ANIM, isMove, moveDur, moveReplacesFlight, moveRadius, moveQuat, moveOffset, moveFov, moveFrame } from './flight-moves.js?v=1';
 
 const MAX_SPEED = 28;            // m/s mit Schub, gut 100 km/h
 const FOLLOW_THRUST = 1.7;       // wie schnell die Geschwindigkeit dem Ziel folgt (pro Sekunde): mit Schub …
 const FOLLOW_GLIDE = 1.1;        // … und ohne, dann gleitet man aus bis zum Schweben
 const SIDE = 7, CLIMB = 7, BRAKE = 6;
-const SPIRAL_DUR = 0.8;          // s für eine ganze Rolle
-const SPIRAL_DIST = 14;          // m Satz nach vorne oder hinten
-const SPIRAL_R = 0.9;            // m Radius der Schraubenbahn
+const BOOST = 1.6;               // Shift: Höchstgeschwindigkeit mal BOOST
+const AUTO_FOLLOW = 2.4;         // Autopilot: so schnell folgt die Geschwindigkeit seiner Vorgabe (pro Sekunde)
 const CAST_CD = 0.16;            // s zwischen zwei Zaubern
 const MAX_ALT = 140;             // m höchstens über dem Gelände
 const CLEAR = 0.3;               // m Abstand Füße–Boden beim Tiefflug
@@ -24,16 +27,21 @@ const CLEAR = 0.3;               // m Abstand Füße–Boden beim Tiefflug
 // Das ergibt 53,5 % Bildschirmhöhe, als Normkoordinate y = 1 - 2 * 0,535 = -0,07. Der Zauber startet dort.
 const TIP_NDC_Y = -0.07;
 
-const UP = new THREE.Vector3(0, 1, 0);
-const smooth = (t) => t * t * (3 - 2 * t);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+/** Für den Autopilot (autopilot.js): Reisegeschwindigkeit und Boost-Faktor des Besens. */
+export const BROOM_SPEED = MAX_SPEED, BROOM_BOOST = BOOST;
 const ease = (k, dt) => 1 - Math.exp(-k * dt);
 
-export function createBroom({ camera, overlay, help, audio, groundAt, player, onCast }) {
+export function createBroom({ camera, overlay, help, audio, groundAt, player, onCast, onMove }) {
   const vel = new THREE.Vector3(), target = new THREE.Vector3();
   const dir = new THREE.Vector3(), side = new THREE.Vector3(), off = new THREE.Vector3(), tip = new THREE.Vector3();
-  const sp = { on: false, t: 0, sign: 1, prevE: 0, d: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), prevOff: new THREE.Vector3() };
-  let active = false, thrust = false, casting = false, castT = 0;
-  let roll = 0, bank = 0, lastYaw = null, lastPitch = null, swayX = 0, swayY = 0, bobT = 0, kick = 0, helpT = 0;
+  // Laufendes Manöver: Startrahmen d/r/u (vorne, rechts, oben), Bahnradius R, Versatz des letzten Bildes
+  const mv = { on: false, move: '', dir: '', t: 0, dur: 1, R: 5, replace: false,
+    d: new THREE.Vector3(), r: new THREE.Vector3(), u: new THREE.Vector3(), prevOff: new THREE.Vector3() };
+  const qMove = new THREE.Quaternion(), qRoll = new THREE.Quaternion(), eul = new THREE.Euler(0, 0, 0, 'YXZ');
+  let active = false, thrust = false, casting = false, castT = 0, boosting = false, curYaw = 0, curPitch = 0;
+  let hovering = true;             // Stillstand (Animation Hover bei den Mitfliegern), mit Abstand zwischen An und Aus
+  let bank = 0, lastYaw = null, lastPitch = null, swayX = 0, swayY = 0, bobT = 0, kick = 0, helpT = 0, wobT = 9;
 
   // ---------- Ton: kleine WebAudio-Synthese über den AudioContext des Spiels ----------
   let wind = null, noiseBuf = null;
@@ -134,14 +142,59 @@ export function createBroom({ camera, overlay, help, audio, groundAt, player, on
     if (help) { help.style.display = on ? 'block' : 'none'; help.style.opacity = '1'; }
   }
 
+  // Wackeln nach einem Treffer (Energieball ohne Schild): abklingende Rolle
+  const wobble = () => (wobT < 1.2 ? Math.sin(wobT * 15) * 0.3 * Math.exp(-3.5 * wobT) : 0);
+
+  /** Manöver starten; false, wenn schon eins läuft oder man nicht auf dem Besen sitzt. */
+  function startMove(move, mdir = '') {
+    if (!active || mv.on || !isMove(move, mdir)) return false;
+    mv.on = true; mv.move = move; mv.dir = mdir; mv.t = 0;
+    mv.dur = moveDur(move, mdir); mv.replace = moveReplacesFlight(move, mdir);
+    moveFrame(curYaw, curPitch, mv.d, mv.r, mv.u);
+    mv.R = moveRadius(move, mdir, vel.length());
+    if (move === 'looping' && mdir === 'back') {        // nach unten: nicht tiefer als bis knapp über den Boden
+      const free = camera.position.y - player.height - groundAt(camera.position.x, camera.position.z);
+      mv.R = Math.max(2.5, Math.min(mv.R, (free - 1.5) / 2));
+    }
+    mv.prevOff.set(0, 0, 0);
+    whoosh();
+    onMove?.({ move, dir: mdir, yaw: curYaw, pitch: curPitch });
+    return true;
+  }
+
   return {
     get active() { return active; },
-    /** Kamera-Rolle: Schräglage in Kurven plus Spirale (rad). */
-    get roll() { return roll + bank; },
+    /** Kamera-Rolle in Kurven (rad); die Manöver stecken in orient(). */
+    get roll() { return bank + wobble(); },
     get vy() { return vel.y; },
+    /** Aktuelle Geschwindigkeit (m/s), für den Autopilot. */
+    get speed() { return vel.length(); },
     get speedFrac() { return Math.min(1, vel.length() / MAX_SPEED); },
-    /** Zusätzliches Sichtfeld während der Spirale (Grad). */
-    get spiralFov() { return sp.on ? Math.sin(Math.PI * sp.t / SPIRAL_DUR) * 8 : 0; },
+    /** Zusätzliches Sichtfeld während eines Manövers und beim Boost (Grad). */
+    get spiralFov() { return (mv.on ? moveFov(mv.t / mv.dur) : 0) + (boosting ? 7 * Math.min(1, vel.length() / MAX_SPEED) : 0); },
+    /** Läuft gerade ein Manöver? */
+    get moving() { return mv.on; },
+    get boosting() { return boosting; },
+    /** Steht man (fast) still in der Luft? */
+    get hovering() { return hovering && !mv.on; },
+    /** Animation der eigenen Figur, wie die Mitflieger sie sehen sollen. */
+    get anim() { return mv.on ? MOVE_ANIM[mv.move] : boosting ? 'Boost' : hovering ? 'Hover' : 'Ride'; },
+    /** Lenkeinschlag -1 … 1 (positiv = links), für LeanLeft/LeanRight bei den Mitfliegern. */
+    get lean() { return THREE.MathUtils.clamp(bank / 0.45, -1, 1); },
+    startMove,
+
+    /** Kamera-Ausrichtung: Blick (yaw, pitch), darin das Manöver, dann die Schräglage. */
+    orient(out, yaw, pitch) {
+      out.setFromEuler(eul.set(pitch, yaw, 0, 'YXZ'));
+      if (mv.on) out.multiply(moveQuat(mv.move, mv.dir, mv.t / mv.dur, qMove));
+      return out.multiply(qRoll.setFromAxisAngle(AXIS_Z, bank + wobble()));
+    },
+    /** Getroffen (ohne Schild): abbremsen und durchschütteln. strength 1 = Energieball, kleiner = Minigun-Salve. */
+    knock(strength = 1) {
+      if (!active) return;
+      vel.multiplyScalar(1 - 0.7 * strength); kick = 1.6 * strength;
+      if (strength >= 0.5 || wobT > 0.6) wobT = 0;
+    },
 
     setThrust(on) { thrust = !!on; },
     fire(on) { casting = !!on; },
@@ -150,73 +203,84 @@ export function createBroom({ camera, overlay, help, audio, groundAt, player, on
       if (active) return;
       active = true; thrust = false; casting = false; castT = 0;
       vel.set(0, 4.5, 0);                       // vom Boden abheben
-      roll = bank = 0; sp.on = false; lastYaw = lastPitch = null; swayX = swayY = kick = 0; helpT = 7;
+      hovering = false; bank = 0; mv.on = false; boosting = false; wobT = 9; lastYaw = lastPitch = null; swayX = swayY = kick = 0; helpT = 7;
       show(true);
       startWind(); chime(true);
     },
     /** Absteigen. Gibt die senkrechte Geschwindigkeit zurück, damit der Fall nahtlos weitergeht. */
     dismount() {
       if (!active) return 0;
-      active = false; thrust = casting = false; sp.on = false; roll = bank = 0;
+      active = false; thrust = casting = false; mv.on = false; boosting = false; bank = 0;
       show(false); stopWind(); chime(false);
       return vel.y;
     },
     /** Sofort weg, ohne Ton (Spielende, Neustart, Kartenwechsel, Mehrspieler). */
     reset() {
-      active = false; thrust = casting = false; sp.on = false; roll = bank = 0; vel.set(0, 0, 0);
+      active = false; thrust = casting = false; mv.on = false; boosting = false; bank = 0; wobT = 9; vel.set(0, 0, 0);
       show(false); stopWind();
     },
     /** Pause oder Menü: Wind leise stellen, bis wieder geflogen wird. */
     quiet() { windTo(0); },
-
-    /** Mausrad: +1 = Spirale nach vorne, -1 = nach hinten. */
-    wheel(sign) {
-      if (!active || sp.on) return;
-      sp.on = true; sp.t = 0; sp.sign = sign; sp.prevE = 0; sp.prevOff.set(0, 0, 0);
-      camera.getWorldDirection(sp.d);
-      sp.r.crossVectors(sp.d, UP);
-      if (sp.r.lengthSq() < 1e-6) sp.r.set(1, 0, 0);   // senkrecht nach oben oder unten geschaut
-      sp.r.normalize();
-      sp.u.crossVectors(sp.r, sp.d).normalize();
-      whoosh();
+    /** Töne für die Besen-Extras in main.js (vorhandene Synthesizer-Töne). */
+    sfx(name) {
+      if (name === 'spit') zap();
+      else if (name === 'shield') chime(true);
+      else if (name === 'shieldOff') chime(false);
+      else if (name === 'hit') whoosh();
     },
 
-    /** Ein Bild Flug: bewegt camera.position. Danach ruft main.js collide() für Gebäude und Kartenrand. */
+    /** Mausrad: +1 = Spirale (Korkenzieher) nach vorne, -1 = nach hinten. */
+    wheel(sign) { return startMove('spiral', sign > 0 ? 'fwd' : 'back'); },
+
+    /**
+     * Ein Bild Flug: bewegt camera.position. Danach ruft main.js collide() für Gebäude und Kartenrand.
+     * inp.auto (Vector3, optional): Autopilot – gewünschte Geschwindigkeit statt der Tasten.
+     */
     update(dt, inp) {
       if (!active) return;
       const pos = camera.position;
+      curYaw = inp.yaw; curPitch = inp.pitch;
       const cp = Math.cos(inp.pitch);
       dir.set(-Math.sin(inp.yaw) * cp, Math.sin(inp.pitch), -Math.cos(inp.yaw) * cp);
       side.set(Math.cos(inp.yaw), 0, -Math.sin(inp.yaw));
 
-      // Zielgeschwindigkeit aus den Eingaben, die echte Geschwindigkeit folgt ihr weich (Trägheit)
-      const go = thrust || inp.forward;
-      target.set(0, 0, 0);
-      if (go) target.addScaledVector(dir, MAX_SPEED);
-      if (inp.brake) target.addScaledVector(dir, -BRAKE);
-      if (inp.right) target.addScaledVector(side, SIDE);
-      if (inp.left) target.addScaledVector(side, -SIDE);
-      if (inp.up) target.y += CLIMB;
-      if (inp.down) target.y -= CLIMB;
-      vel.lerp(target, ease(go ? FOLLOW_THRUST : FOLLOW_GLIDE, dt));
-      pos.addScaledVector(vel, dt);
-
-      // Schweben: sanftes Auf und Ab, solange kaum Fahrt ist
+      // Zielgeschwindigkeit aus den Eingaben, die echte Geschwindigkeit folgt ihr weich (Trägheit).
+      // Looping und Steilspirale ersetzen den Flug: Fahrt bleibt stehen und geht danach genauso weiter.
+      const auto = inp.auto || null;
+      const go = thrust || inp.forward || (!!auto && auto.lengthSq() > 4);
+      boosting = auto ? auto.length() > MAX_SPEED * 1.05 : go && !!inp.boost;
+      const spd = vel.length();
+      if (hovering && (go || spd > 2)) hovering = false;
+      else if (!hovering && !go && spd < 1) hovering = true;
       bobT += dt;
       const still = 1 - Math.min(1, vel.length() / 3);
-      pos.y += Math.cos(bobT * 2.1) * 0.25 * still * dt;
-
-      // Spirale: eine ganze Rolle, dabei ein Satz nach vorne oder hinten auf einer Schraubenbahn
-      if (sp.on) {
-        sp.t = Math.min(SPIRAL_DUR, sp.t + dt);
-        const e = smooth(sp.t / SPIRAL_DUR), phi = 2 * Math.PI * e;
-        pos.addScaledVector(sp.d, sp.sign * SPIRAL_DIST * (e - sp.prevE));
-        off.copy(sp.r).multiplyScalar((Math.cos(phi) - 1) * SPIRAL_R).addScaledVector(sp.u, Math.sin(phi) * SPIRAL_R * sp.sign);
-        pos.add(sp.prevOff.negate().add(off));
-        sp.prevOff.copy(off); sp.prevE = e;
-        roll = -sp.sign * phi;                    // vorwärts rollt nach rechts, rückwärts nach links
-        if (sp.t >= SPIRAL_DUR) { sp.on = false; roll = 0; }
+      if (!(mv.on && mv.replace)) {
+        if (auto) target.copy(auto);
+        else {
+          target.set(0, 0, 0);
+          if (go) target.addScaledVector(dir, MAX_SPEED * (boosting ? BOOST : 1));
+          if (inp.brake) target.addScaledVector(dir, -BRAKE);
+          if (inp.right) target.addScaledVector(side, SIDE);
+          if (inp.left) target.addScaledVector(side, -SIDE);
+          if (inp.up) target.y += CLIMB;
+          if (inp.down) target.y -= CLIMB;
+        }
+        vel.lerp(target, ease(auto ? AUTO_FOLLOW : go ? FOLLOW_THRUST : FOLLOW_GLIDE, dt));
+        pos.addScaledVector(vel, dt);
+        // Schweben: sanftes Auf und Ab, solange kaum Fahrt ist
+        pos.y += Math.cos(bobT * 2.1) * 0.25 * still * dt;
       }
+
+      // Manöver: Bahn im Startrahmen (flight-moves.js), jedes Bild nur der Zuwachs (Kollision darf eingreifen)
+      if (mv.on) {
+        mv.t = Math.min(mv.dur, mv.t + dt);
+        const o = moveOffset(mv.move, mv.dir, mv.t / mv.dur, mv.R, tip);
+        off.copy(mv.r).multiplyScalar(o.x).addScaledVector(mv.u, o.y).addScaledVector(mv.d, -o.z);
+        pos.add(mv.prevOff.negate().add(off));
+        mv.prevOff.copy(off);
+        if (mv.t >= mv.dur) mv.on = false;
+      }
+      wobT += dt;
 
       // Schräglage in Kurven und Schwanken des Bildes
       if (lastYaw !== null) {

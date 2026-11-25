@@ -127,7 +127,7 @@ export class Viewmodel {
     // fills half the screen. The support hand is therefore placed on the REAR of
     // the handguard instead, which buys the reach without moving the joint into
     // shot.
-    // Rabbit of Duty: beide Ärmel 1,6-mal so breit, damit sie nach demselben Kleidungsstück aussehen.
+    // Flying Much: beide Ärmel 1,6-mal so breit, damit sie nach demselben Kleidungsstück aussehen.
     // Der linke Ellbogen sitzt tiefer und weiter außen, dadurch kommt der Unterarm schräg von unten
     // links ins Bild statt quer hindurch. Die Griffhaltung dazu steht in rifle.js unter gripL.
     this.armR = new Arm(1, handMats, {
