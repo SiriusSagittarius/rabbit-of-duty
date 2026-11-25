@@ -5,7 +5,8 @@ den Ortskern von Much im Bergischen Land: Das Dorf ist aus amtlichen offenen Geo
 echten Häusern, Luftbild, Bäumen und Straßen. Das Spiel läuft ohne Installation im Browser, auch auf Laptops mit
 integrierter Grafik.
 
-Ein unabhängiges, nicht kommerzielles Hobbyprojekt. Gespielt wird ohne Waffen, damit auch Kinder mitmachen können.
+Ein unabhängiges, nicht kommerzielles Hobbyprojekt, gedacht auch für Kinder: Es gibt kein Blut und keine Lebenspunkte,
+niemand scheidet aus. Energieball und Minigun am Besen bremsen getroffene Mitflieger nur kurz aus oder kosten Schildenergie.
 Die früheren Kampfmodi (Zombies, Söldner, Deathmatch, Waffenkammer) stecken noch im Code, sind aber ausgeblendet:
 `KAMPF_SICHTBAR` in `src/main.js` schaltet sie wieder ein. Die Abschnitte dazu weiter unten gelten nur dann.
 
@@ -55,6 +56,10 @@ Die früheren Kampfmodi (Zombies, Söldner, Deathmatch, Waffenkammer) stecken no
   halten, die Läufe laufen an, dann gibt es Dauerfeuer mit Leuchtspur (Treffer bremsen bzw. kosten Schildenergie). Wer
   stillsteht, schwebt locker auf dem Besen und streckt sich, gähnt oder klopft auf den Stiel. Abschalten lässt sich die
   Minigun mit `MINIGUN_AN = false` in `src/main.js`.
+- **Wunschliste:** Im Start- und Pausemenü steht „💡 Wunschliste“: geplante und erledigte Wünsche (abgehakt), jeweils
+  mit dem Namen dessen, der sie vorgeschlagen hat. Ein Knopf öffnet eine Mail mit Vorlage an flyingmuch@revotronic.de,
+  dorthin schicken Spieler Vorschläge und Material (Fotos, Töne, Musik, 3D-Modelle). Gepflegt wird die Liste in
+  `wunschliste.json` (siehe „Erweitern“).
 - **Wer ist online:** Im Menü steht „🟢 3 online · 12 heute · 345 gesamt“. Wer mit Spielnamen das Spiel öffnet oder
   verlässt, wird allen anderen kurz angezeigt („Lars ist dem Spiel beigetreten“). Der Besucherzähler kommt ohne
   Cookies aus: Der Server zählt Besucher je Tag über einen Hash aus IP-Adresse, Browserkennung und einem täglich neuen
@@ -170,7 +175,7 @@ eigenen Rekord.
 | M | Musik an oder aus |
 | Esc | Pause |
 
-Auf dem Besen:
+Auf dem Besen (dieselbe Übersicht steht im Spiel unter „📖 Anleitung“ im Startmenü und in der Pause, mit eigenem Reiter fürs Handy):
 
 | Taste | Aktion |
 |---|---|
@@ -206,6 +211,8 @@ Auf dem Besen:
 | `src/much-landmarks.js` | Kirchturm von St. Martinus, Kugelbrunnen, Wandtexturen für Kirche und Bank |
 | `src/navmap.js` | Karte und Navi, Mitflieger-Liste und Luftroute im Erkundungsflug |
 | `src/autopilot.js` | Autopilot: fliegt die Luftroute zum Mitflieger, dann Begleitflug |
+| `src/wishlist.js`, `wunschliste.json` | Wunschliste im Menü und ihre Einträge |
+| `src/guide.js` | Anleitung (Startmenü „📖 Anleitung“ und Pause): Besen-Steuerung für PC und Handy |
 | `src/zombie-pak.js` | öffnet das verschlüsselte Zombie-Paket |
 | `src/pickups.js` | Munitionskisten |
 | `src/broom.js` | Flugbesen: Flugphysik, Manöver, Boost, Zauber, Fluggeräusch |
@@ -229,6 +236,20 @@ Auf dem Besen:
 | `vendor/three/` | Three.js |
 
 ## Erweitern
+
+### Wunschliste pflegen
+
+Die Einträge stehen in `wunschliste.json`. Das Spiel lädt die Datei bei jedem Öffnen der Wunschliste neu: Hochladen
+genügt, ein neuer `?v=` ist nicht nötig. Neue Einträge kommen oben in `items`:
+
+```json
+{ "id": "kirchturm-glocken", "titel": "Glocken im Kirchturm", "text": "Zur vollen Stunde läuten die Glocken.",
+  "von": "Lena", "status": "offen", "datum": "2026-11-26" }
+```
+
+`status` ist `offen`, `arbeit` (wird gerade gebaut, steht oben mit „in Arbeit“) oder `erledigt`. Bei `erledigt` kommt
+`"fertig": "JJJJ-MM-TT"` dazu, dann ist der Punkt abgehakt. `von` ist der Spielname aus der Mail. `email` oben in der
+Datei ist die Adresse, an die der Mail-Knopf schickt.
 
 ### Weitere Orte
 

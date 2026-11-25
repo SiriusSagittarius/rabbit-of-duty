@@ -9,6 +9,8 @@ import { Music } from './music.js?v=3';
 import { Arsenal, buildGrenadeMesh } from './arsenal.js?v=7';
 import { createBroom, BROOM_SPEED, BROOM_BOOST } from './broom.js?v=5';
 import { createAutopilot } from './autopilot.js?v=1';
+import { createGuide } from './guide.js?v=2';
+import { createWishlist } from './wishlist.js?v=1';
 import { createEnergyBalls } from './energyball.js?v=1';
 import { loadFlyerTemplate, createFlyer, createMuzzleFlash, flickerFlash, FLYER_HEAD, MUZZLE_FROM_EYE, FIDGETS, SPIN_MAX, SPIN_UP, SPIN_DOWN } from './flyer.js?v=3';
 import { createExplore } from './explore.js?v=3';
@@ -1928,16 +1930,22 @@ document.addEventListener('pointerlockchange', ()=>{
   }
 });
 ui.start.addEventListener('click', ()=>{ startClick(); });
+// Anleitung: wie man den Besen steuert (Startmenü „📖 Anleitung“, Pause „📖 Anleitung & Steuerung“)
+const guide = createGuide({ touch: TOUCH, minigun: MINIGUN_AN, kampf: KAMPF_SICHTBAR });
+$('guideBtn')?.addEventListener('click', (e) => { e.stopPropagation(); guide.open(); });
+// Wunschliste: Vorschläge der Spieler, Material per Mail (src/wishlist.js, Einträge pflegt der Entwickler in wunschliste.json)
+const wishlist = createWishlist();
+$('wishBtn')?.addEventListener('click', (e) => { e.stopPropagation(); wishlist.open(); });
 canvas.addEventListener('click', ()=>{ if(state==='ready') startClick(); });
 
 // Pause-Menü-Buttons
-function showPauseButtons(){ $('pauseButtons').style.display='flex'; $('pauseControls').style.display='none'; }
+function showPauseButtons(){ $('pauseButtons').style.display='flex'; }
 $('pauseButtons').style.flexDirection='column'; $('pauseButtons').style.gap='12px'; $('pauseButtons').style.display='flex';
 ui.pause.addEventListener('click', e=>{
   const act = e.target.getAttribute('data-act'); if(!act) return;
   if(act==='resume') lock();
-  else if(act==='controls'){ $('pauseButtons').style.display='none'; $('pauseControls').style.display='block'; }
-  else if(act==='back') showPauseButtons();
+  else if(act==='controls') guide.open();               // Anleitung (src/guide.js)
+  else if(act==='wish') wishlist.open();                // Wunschliste (src/wishlist.js, Einträge in wunschliste.json)
   else if(act==='music') toggleMusic();
   else if(act==='mute'){ audio.muted=!audio.muted; e.target.textContent = audio.muted?'🔇 Sound-FX: AUS':'🔊 Sound-FX: AN'; }
   else if(act==='quit') quit();
@@ -2802,10 +2810,6 @@ function setupGameModeAndMusicListeners() {
     }
     for (const id of ['hsListClassic', 'hsListZombies']) { const col = $(id)?.parentElement; if (col) col.style.display = 'none'; }
     const cols = $('hsListExplore')?.parentElement?.parentElement; if (cols) cols.style.gridTemplateColumns = '1fr';
-    const grid = $('pauseControls')?.querySelector('.ctrlGrid');
-    if (grid) grid.innerHTML = '<span>Schub</span><b>W / Maus 3</b><span>Lenken</span><b>Maus</b><span>Bremsen</span><b>S</b>'
-      + '<span>Steigen / Sinken</span><b>Leertaste / C</b><span>Seitlich</span><b>A / D</b><span>Spirale</span><b>Mausrad</b>'
-      + '<span>Karte &amp; Navi</span><b>N / Tab</b><span>Musik an/aus</span><b>M</b><span>Pause</span><b>ESC</b>';
     const hint = ui.start.querySelector('.hint.pulse');
     if (hint) hint.textContent = 'Klicke auf „Losfliegen“ – die Maus wird eingefangen';
     const solo = $('soloPlayBtn'); if (solo) solo.textContent = '▶ Losfliegen';

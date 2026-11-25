@@ -1,0 +1,85 @@
+{
+  "email": "flyingmuch@revotronic.de",
+  "hinweis": "Pflege: neue Einträge oben einfügen. status = offen | arbeit | erledigt. von = Spielname des Einsenders. datum = eingetragen, fertig = erledigt am.",
+  "items": [
+    {
+      "id": "abstimmung",
+      "titel": "Abstimmen, was zuerst kommt",
+      "text": "Wenn die Liste lang wird, könnt ihr abstimmen, welcher Wunsch als Nächstes gebaut wird.",
+      "von": "Revotronic",
+      "status": "offen",
+      "datum": "2026-11-25"
+    },
+    {
+      "id": "fassaden-weitere",
+      "titel": "Mehr echte Hausfassaden in Much",
+      "text": "Weitere Straßen sollen so aussehen wie in echt. Schick Fotos von Häusern in Much: gerade von vorne, ohne Personen und Autokennzeichen.",
+      "von": "Revotronic",
+      "status": "offen",
+      "datum": "2026-11-25"
+    },
+    {
+      "id": "anleitung",
+      "titel": "Anleitung im Spiel",
+      "text": "Steuerung für PC und Handy im Startmenü und in der Pause.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-25",
+      "fertig": "2026-11-25"
+    },
+    {
+      "id": "navi-autopilot",
+      "titel": "Navi zu Mitfliegern mit Autopilot",
+      "text": "In der Karte einen Mitflieger wählen: Leuchtband in der Luft zeigt den Weg, der Autopilot fliegt hin.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-25",
+      "fertig": "2026-11-25"
+    },
+    {
+      "id": "radar-mitflieger",
+      "titel": "Radar zeigt die Mitflieger",
+      "text": "Blaue Punkte mit Namen, dazu die noch offenen Orte.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-24",
+      "fertig": "2026-11-24"
+    },
+    {
+      "id": "besen-extras",
+      "titel": "Kunststücke, Energieball und Schutzschild",
+      "text": "Looping, Fassrolle, Spiralen und Tricks, die auch die Mitflieger sehen. Wer stillsteht, schwebt locker auf dem Besen.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-24",
+      "fertig": "2026-11-24"
+    },
+    {
+      "id": "online",
+      "titel": "Sehen, wer gerade online ist",
+      "text": "Anzeige im Menü und kurze Meldung, wenn jemand dazukommt oder geht.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-24",
+      "fertig": "2026-11-24"
+    },
+    {
+      "id": "team-handy",
+      "titel": "Im Team fliegen, auch mit dem Handy",
+      "text": "Bis zu 8 Spieler zusammen. Am Handy lenkt man durch Neigen.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-24",
+      "fertig": "2026-11-24"
+    },
+    {
+      "id": "erkundungsflug",
+      "titel": "Erkundungsflug durch Much",
+      "text": "15 Orte finden, Punkte sammeln, Bestenliste.",
+      "von": "Revotronic",
+      "status": "erledigt",
+      "datum": "2026-11-24",
+      "fertig": "2026-11-24"
+    }
+  ]
+}
