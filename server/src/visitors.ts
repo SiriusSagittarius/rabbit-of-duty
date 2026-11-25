@@ -37,6 +37,16 @@ function save() {
   }, 5000);
 }
 
+// Beim Beenden (z. B. Neustart nach dem Hochladen; Colyseus ruft dann process.exit) die Zahlen sofort schreiben,
+// damit Besuche aus den letzten 5 Sekunden nicht verloren gehen. Eigene .tmp-Datei, falls gerade save() schreibt.
+process.on('exit', () => {
+  if (timer) clearTimeout(timer);
+  try {
+    fs.writeFileSync(FILE + '.exit.tmp', JSON.stringify(data));
+    fs.renameSync(FILE + '.exit.tmp', FILE);
+  } catch { /* beim Beenden nichts mehr zu machen */ }
+});
+
 /** Einen Besuch zählen (einmal je Besucher und Tag). */
 export function countVisit(ip: string, ua: string) {
   roll();
