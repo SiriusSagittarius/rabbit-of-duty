@@ -57,7 +57,7 @@ Die früheren Kampfmodi (Zombies, Söldner, Deathmatch, Waffenkammer) stecken no
   stillsteht, schwebt locker auf dem Besen und streckt sich, gähnt oder klopft auf den Stiel. Abschalten lässt sich die
   Minigun mit `MINIGUN_AN = false` in `src/main.js`.
 - **Wunschliste:** Im Start- und Pausemenü steht „💡 Wunschliste“: geplante und erledigte Wünsche (abgehakt), jeweils
-  mit dem Namen dessen, der sie vorgeschlagen hat. Ein Knopf öffnet eine Mail mit Vorlage an flyingmuch@hapaluv.de,
+  mit dem Namen dessen, der sie vorgeschlagen hat. Ein Knopf bietet eine Mail mit Vorlage an flyingmuch@hapaluv.de an (Mail-Programm, Gmail, Outlook oder Vorlage kopieren),
   dorthin schicken Spieler Vorschläge und Material (Fotos, Töne, Musik, 3D-Modelle). Gepflegt wird die Liste in
   `wunschliste.json` (siehe „Erweitern“).
 - **Wer ist online:** Im Menü steht „🟢 3 online · 12 heute · 345 gesamt“. Wer mit Spielnamen das Spiel öffnet oder

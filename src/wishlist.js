@@ -2,7 +2,9 @@
 //
 // Die Einträge stehen in wunschliste.json (vom Entwickler gepflegt, wird bei jedem Öffnen frisch geladen):
 //   { email, items: [{ id, titel, text, von, status: 'offen' | 'arbeit' | 'erledigt', datum, fertig }] }
-// Oben: Mail-Knopf mit Vorlage an die Adresse aus der Datei, Adresse zum Kopieren, Regeln fürs Einsenden.
+// Oben: Mail-Knopf, Adresse zum Kopieren, Regeln fürs Einsenden. Der Knopf klappt eine Auswahl auf: Mail-Programm
+// (mailto), Gmail, Outlook/Hotmail im Browser oder Vorlage kopieren. Viele PCs haben kein Mail-Programm eingerichtet,
+// dann tut ein reiner mailto-Link nichts (oder öffnet nur ein leeres Fenster).
 // Darunter „Geplant“ (offen / in Arbeit) und „Erledigt“ (abgehakt) mit dem Namen dessen, der es vorgeschlagen hat.
 
 const URL_LIST = './wunschliste.json';
@@ -19,16 +21,19 @@ const el = (tag, cls, text) => {
   return e;
 };
 
-function mailHref(email) {
-  const subject = 'Flying Much – Vorschlag';
-  const body = [
-    'Mein Spielname (steht dann beim Vorschlag in der Liste):', '', '',
-    'Mein Vorschlag:', '', '', '',
-    'Material im Anhang (Fotos, Töne, Musik, 3D-Modelle):', '',
-    'Selbst gemacht? Oder woher stammt es (Quelle und Lizenz)?', '', '',
-  ].join('\n');
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
+const SUBJECT = 'Flying Much – Vorschlag';
+const BODY = [
+  'Mein Spielname (steht dann beim Vorschlag in der Liste):', '', '',
+  'Mein Vorschlag:', '', '', '',
+  'Material im Anhang (Fotos, Töne, Musik, 3D-Modelle):', '',
+  'Selbst gemacht? Oder woher stammt es (Quelle und Lizenz)?', '', '',
+].join('\n');
+const q = encodeURIComponent;
+const WAYS = {
+  app: (m) => `mailto:${m}?subject=${q(SUBJECT)}&body=${q(BODY)}`,
+  gmail: (m) => `https://mail.google.com/mail/?view=cm&fs=1&to=${q(m)}&su=${q(SUBJECT)}&body=${q(BODY)}`,
+  outlook: (m) => `https://outlook.live.com/mail/0/deeplink/compose?to=${q(m)}&subject=${q(SUBJECT)}&body=${q(BODY)}`,
+};
 
 export function createWishlist() {
   const root = el('div', 'ovp');
@@ -40,8 +45,19 @@ export function createWishlist() {
         <p class="g-goal">Das sind die Wünsche für Flying Much. Gute Vorschläge kommen mit dem Namen des Einsenders in die
           Liste, und was fertig ist, wird abgehakt.</p>
         <div class="w-send">
-          <a class="btn primary w-mail" href="#">✉️ Vorschlag oder Material schicken</a>
+          <a class="btn primary w-mail" href="#" aria-expanded="false">✉️ Vorschlag oder Material schicken</a>
           <div class="w-addr"><span class="w-email"></span><button type="button" class="w-copy">Adresse kopieren</button></div>
+        </div>
+        <div class="w-ways">
+          <div class="w-ways-head">Womit schreibst du deine Mails?</div>
+          <div class="w-ways-row">
+            <a class="w-way" data-way="app" href="#">📧 Mail-Programm</a>
+            <a class="w-way" data-way="gmail" href="#" target="_blank" rel="noopener">Gmail</a>
+            <a class="w-way" data-way="outlook" href="#" target="_blank" rel="noopener">Outlook / Hotmail</a>
+            <button type="button" class="w-tpl">📋 Vorlage kopieren</button>
+          </div>
+          <p class="g-note">GMX, WEB.DE, T-Online oder ein anderer Anbieter: „Vorlage kopieren“, dort eine neue Mail an die
+            Adresse oben schreiben und den Text einfügen. Fotos, Töne oder Modelle hängst du an die Mail an.</p>
         </div>
         <p class="g-note">Du kannst Ideen schicken und Material, das ins Spiel soll: Fotos von Hausfassaden, Töne und Musik,
           3D-Modelle (GLB) oder animierte Figuren. Ich schaue mir alles an.</p>
@@ -59,9 +75,17 @@ export function createWishlist() {
   document.body.appendChild(root);
   const body = root.querySelector('.g-body'), list = root.querySelector('.w-list');
   const mailBtn = root.querySelector('.w-mail'), emailEl = root.querySelector('.w-email'), copyBtn = root.querySelector('.w-copy');
+  const ways = root.querySelector('.w-ways'), tplBtn = root.querySelector('.w-tpl');
   let open = false, email = FALLBACK_MAIL;
 
-  const setEmail = (m) => { email = m || FALLBACK_MAIL; emailEl.textContent = email; mailBtn.href = mailHref(email); };
+  const setEmail = (m) => {
+    email = m || FALLBACK_MAIL; emailEl.textContent = email;
+    for (const a of root.querySelectorAll('[data-way]')) a.href = WAYS[a.dataset.way](email);
+  };
+  const showWays = (on) => { ways.classList.toggle('open', on); mailBtn.setAttribute('aria-expanded', String(on)); };
+  const copy = (text, btn, label) => {
+    navigator.clipboard?.writeText(text).then(() => { btn.textContent = label; }, () => { btn.textContent = 'Kopieren ging nicht'; });
+  };
   setEmail(FALLBACK_MAIL);
 
   function item(it) {
@@ -110,15 +134,17 @@ export function createWishlist() {
 
   const api = {
     get isOpen() { return open; },
-    open() { open = true; root.style.display = 'flex'; body.scrollTop = 0; copyBtn.textContent = 'Adresse kopieren'; load(); },
+    open() {
+      open = true; root.style.display = 'flex'; body.scrollTop = 0; showWays(false);
+      copyBtn.textContent = 'Adresse kopieren'; tplBtn.textContent = '📋 Vorlage kopieren'; load();
+    },
     close() { open = false; root.style.display = 'none'; },
   };
   root.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (e.target.closest('.w-copy')) {
-      navigator.clipboard?.writeText(email).then(() => { copyBtn.textContent = 'Kopiert ✓'; }, () => { copyBtn.textContent = email; });
-      return;
-    }
+    if (e.target.closest('.w-mail')) { e.preventDefault(); showWays(!ways.classList.contains('open')); return; }
+    if (e.target.closest('.w-copy')) { copy(email, copyBtn, 'Kopiert ✓'); return; }
+    if (e.target.closest('.w-tpl')) { copy(`An: ${email}\nBetreff: ${SUBJECT}\n\n${BODY}`, tplBtn, 'Vorlage kopiert ✓'); return; }
     if (e.target.closest('.g-close') || e.target === root) api.close();
   });
   addEventListener('keydown', (e) => { if (open && e.code === 'Escape') { e.stopPropagation(); api.close(); } }, true);

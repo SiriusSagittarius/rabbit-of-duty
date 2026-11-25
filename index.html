@@ -95,6 +95,14 @@
     #wish .w-send { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 0 4px; }
     #wish .w-mail { display: inline-block; min-width: 0; text-decoration: none; }
     #wish .w-addr { display: flex; align-items: center; gap: 8px; color: #ffe7a0; font-weight: 700; font-size: 14px; user-select: all; }
+    #wish .w-ways { display: none; margin: 10px 0 4px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,204,64,0.3); }
+    #wish .w-ways.open { display: block; }
+    #wish .w-ways-head { color: #ffe7a0; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+    #wish .w-ways-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    #wish .w-way { font: 700 13px "Segoe UI", system-ui, sans-serif; color: var(--ink); text-decoration: none; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05); padding: 7px 12px; }
+    #wish .w-way:hover, #wish .w-ways button:hover { border-color: #ffcc40; background: rgba(255,204,64,0.12); }
     #wish .w-rules { margin: 8px 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
     #wish .w-item { display: flex; gap: 12px; align-items: flex-start; padding: 9px 10px; border-radius: 8px; margin-bottom: 6px;
       background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
@@ -564,6 +572,6 @@
     }
   }
   </script>
-  <script type="module" src="./src/main.js?v=66"></script>
+  <script type="module" src="./src/main.js?v=67"></script>
 </body>
 </html>
