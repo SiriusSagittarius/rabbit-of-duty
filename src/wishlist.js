@@ -6,7 +6,7 @@
 // Darunter „Geplant“ (offen / in Arbeit) und „Erledigt“ (abgehakt) mit dem Namen dessen, der es vorgeschlagen hat.
 
 const URL_LIST = './wunschliste.json';
-const FALLBACK_MAIL = 'flyingmuch@revotronic.de';
+const FALLBACK_MAIL = 'flyingmuch@hapaluv.de';
 
 const fmtDate = (iso) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');

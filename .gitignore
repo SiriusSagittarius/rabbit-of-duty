@@ -32,3 +32,5 @@ assets/imgmuch/
 
 # --- Bestenliste des Spielservers (Daten der Spieler, nicht ins Repo) ---
 server/data/
+MAILSERVER-AUFGABEN.md
+FLYINGMUCH-EMAIL.md
