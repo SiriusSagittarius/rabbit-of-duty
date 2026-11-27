@@ -7,6 +7,8 @@ import { Schema, MapSchema, type } from '@colyseus/schema';
  */
 export class Flyer extends Schema {
   @type('string') name = 'Flieger';
+  /** Spielfigur: 'soldat' oder 'hexe' (Modell und Maße legt jeder Client selbst fest). */
+  @type('string') char = 'soldat';
   @type('number') x = 0;
   @type('number') y = 0;
   @type('number') z = 0;
@@ -21,8 +23,9 @@ export class Flyer extends Schema {
 }
 
 const ANIMS = new Set(['Ride', 'Hover', 'LeanLeft', 'LeanRight', 'HoldTight', 'Roll', 'Boost', 'Trick', 'Spit',
-  'FidgetStretch', 'FidgetYawn', 'FidgetTap']);
-const MOVES: Record<string, string[]> = { looping: ['fwd', 'back'], roll: ['left', 'right'], spiral: ['left', 'right', 'fwd', 'back'], trick: [''] };
+  'FidgetStretch', 'FidgetYawn', 'FidgetTap', 'Wave', 'Handstand', 'LieDown', 'Dance']);
+const MOVES: Record<string, string[]> = { looping: ['fwd', 'back'], roll: ['left', 'right'], spiral: ['left', 'right', 'fwd', 'back'], trick: [''],
+  wave: [''], handstand: [''], liedown: [''], dance: [''] };
 const num = (v: unknown, lim = 1e6) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-lim, Math.min(lim, v)) : 0);
 const vec = (v: unknown) => (Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === 'number' && Number.isFinite(n))
   ? (v as number[]).map((n) => Math.round(Math.max(-1e5, Math.min(1e5, n)) * 100) / 100) : null);
@@ -99,8 +102,9 @@ export class ExploreRoom extends Room<ExploreState> {
     });
   }
 
-  onJoin(client: Client, options?: { name?: string }): void {
+  onJoin(client: Client, options?: { name?: string; char?: string }): void {
     const p = new Flyer();
+    p.char = options?.char === 'hexe' ? 'hexe' : 'soldat';
     p.name = String(options?.name || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16) || `Flieger-${this.clients.length}`;
     this.state.players.set(client.sessionId, p);
     console.log(`[explore +] ${p.name} (${client.sessionId}) – Spieler: ${this.state.players.size}`);

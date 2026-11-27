@@ -26,6 +26,10 @@ function pcHtml({ minigun, kampf }) {
       [`${k('Z')} ${k('U')}`, 'Steilspirale links / rechts (auf englischer Tastatur Y statt Z)'],
       [k('Mausrad'), 'Korkenzieher: hoch = nach vorne, runter = nach hinten'],
       [k('T'), 'Trick'],
+      [k('L'), 'Winken'],
+      [k('H'), 'Handstand auf dem Besen'],
+      [k('J'), 'Hinlegen und entspannen'],
+      [k('K'), 'Tanzen'],
     ]),
     sec(minigun ? 'Energieball, Schild und Minigun' : 'Energieball und Schild', [
       [`${k('V')} oder ${k('rechte Maustaste')}`, 'Energieball spucken'],
@@ -64,17 +68,17 @@ function pcHtml({ minigun, kampf }) {
 function touchHtml() {
   return [
     sec('Halten und lenken', [
-      ['📱 quer halten', 'Beim Start gilt die Haltung als Mitte.'],
+      ['📱 Ausrichten', 'Beim Start: Halte das Handy so, wie es bequem ist, und kurz ruhig, bis der Balken voll ist. Diese Haltung ist dann die Mitte. Nach dem Drehen des Bildschirms kommt das Ausrichten von selbst.'],
       ['nach rechts / links kippen', 'Kurve'],
       ['nach vorne / hinten kippen', 'nach unten / nach oben schauen. Du fliegst dorthin, wohin du schaust.'],
       ['Wischen', 'auf einer freien Stelle: Sicht drehen (geht auch ohne Neigen)'],
-    ], 'Wenn das Neigen nicht klappt: Das Handy gibt die Neigung nur auf der Internetseite des Spiels frei (https), iPhones fragen einmal nach Erlaubnis. Wischen geht immer.'),
+    ], 'Legst du das Handy hin, pausiert das Neigen. Driftet der Besen, obwohl du das Handy ruhig hältst: ⟲ tippen und neu ausrichten. Wenn das Neigen gar nicht klappt: Das Handy gibt die Neigung nur auf der Internetseite des Spiels frei (https), iPhones fragen einmal nach Erlaubnis. Wischen geht immer.'),
     sec('Knöpfe', [
       [k('SCHUB'), 'rechts unten, gedrückt halten: fliegen'],
       [k('BREMSE'), 'bremsen'],
       [`${k('▲')} ${k('▼')}`, 'links: steigen / sinken'],
       [k('🌀'), 'Korkenzieher'],
-      [k('⟲ Mitte'), 'die jetzige Haltung als Mitte nehmen'],
+      [k('⟲ Mitte'), 'neu ausrichten: Handy bequem halten, kurz ruhig halten'],
       [k('📱 Neigen'), 'Lenken mit Neigen an / aus'],
       [k('⏸'), 'Pause'],
     ]),

@@ -243,6 +243,10 @@
       background: #111720; border: 1px solid rgba(255,204,64,0.45); border-radius: 12px; padding: 22px; }
     #exploreDialog input { width: 100%; max-width: 320px; padding: 10px 14px; font-size: 1.1rem; border-radius: 8px;
       border: 1px solid rgba(255,255,255,0.25); background: #0b1016; color: #fff; text-align: center; }
+    #exploreDialog .char-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    #exploreDialog .char-tile { width: 128px; min-width: auto; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 2px solid transparent; opacity: 0.7; }
+    #exploreDialog .char-tile img { width: 100%; height: 92px; object-fit: contain; border-radius: 6px; background: rgba(255,255,255,0.05); }
+    #exploreDialog .char-tile.sel { border-color: #ffd34d; opacity: 1; }
     #exploreDialog .ex-note { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.45; }
     #exploreDialog .ex-err { min-height: 18px; font-size: 13px; color: #ff8a8a; }
     .login-box { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: var(--muted);
@@ -260,6 +264,10 @@
     .tc-btn.on { background: rgba(255,204,64,0.55); border-color: #ffcc40; }
     .tc-thrust { right: max(22px, env(safe-area-inset-right)); bottom: 26px; width: 104px; height: 104px; font-size: 15px; }
     .tc-brake { right: calc(max(22px, env(safe-area-inset-right)) + 118px); bottom: 22px; width: 72px; height: 72px; font-size: 11px; }
+    .tc-tricks { right: calc(max(22px, env(safe-area-inset-right)) + 92px); bottom: 146px; width: 62px; height: 62px; font-size: 24px; }
+    .tc-trickmenu { position: absolute; right: calc(max(22px, env(safe-area-inset-right)) + 20px); bottom: 216px; display: none; flex-direction: column; gap: 8px; }
+    .tc-trickmenu.on { display: flex; }
+    .tc-trickmenu .tc-btn { position: static; width: auto; height: 44px; padding: 0 16px; font-size: 16px; white-space: nowrap; border-radius: 22px; }
     .tc-spiral { right: calc(max(22px, env(safe-area-inset-right)) + 20px); bottom: 146px; width: 62px; height: 62px; font-size: 24px; }
     .tc-up, .tc-down { left: max(22px, env(safe-area-inset-left)); width: 72px; height: 72px; font-size: 24px; }
     .tc-up { bottom: 112px; } .tc-down { bottom: 26px; }
@@ -269,12 +277,41 @@
       right: calc(max(14px, env(safe-area-inset-right)) + 58px); width: 92px; }
     .tc-cal { left: max(14px, env(safe-area-inset-left)); width: 96px; }
     .tc-tilt { left: calc(max(14px, env(safe-area-inset-left)) + 106px); width: 140px; }
+    /* Hinweis der Neigungssteuerung (src/touch.js): Ausrichten mit Balken, Mitte gespeichert, liegt still, zu weit gekippt */
+    .tc-hint { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: none; pointer-events: none;
+      width: max-content; max-width: min(82vw, 400px); padding: 10px 16px; border-radius: 12px; text-align: center;
+      background: rgba(8,14,20,0.8); border: 1px solid rgba(255,204,64,0.55); color: #ffe7a0; font: 800 15px/1.3 system-ui, sans-serif; }
+    .tc-hint.on { display: block; }
+    .tc-hint small { display: block; margin-top: 4px; color: #d6e2ea; font-weight: 600; font-size: 12.5px; }
+    .tc-hint .tc-bar { display: block; height: 6px; margin-top: 9px; border-radius: 3px; background: rgba(255,255,255,0.14); overflow: hidden; }
+    .tc-hint .tc-bar i { display: block; height: 100%; background: #ffcc40; }
     body.touch #hudMusicBtn { display: none !important; }
     /* Radar auf dem Handy: kleiner, unter dem Pause-Knopf */
     body.touch #radarContainer { width: 112px !important; height: 112px !important; top: 58px !important;
       right: max(14px, env(safe-area-inset-right)) !important; }
     body.touch #broomHelp { display: none !important; }
     body.explore #broomHelp { top: 92px !important; }
+    /* Radar auf dem Handy nur im Flug (im Menü lag es über Titel und Knöpfen) */
+    body.touch:not(.playing) #radarContainer { display: none !important; }
+    /* Ziel-Anzeige so breit wie ihr Text (mit left: 50% brach sie sonst schon bei halber Bildschirmbreite um) */
+    body.touch #exploreHud { width: max-content; max-width: calc(100vw - 28px); }
+    /* Schmale Bildschirme: „Mitte“ und „Neigen“ nur als Symbol, damit die Ziel-Anzeige dazwischen Platz hat */
+    @media (orientation: portrait), (max-width: 760px) {
+      .tc-long { display: none; }
+      .tc-cal { width: 44px; font-size: 18px; }
+      .tc-tilt { left: calc(max(14px, env(safe-area-inset-left)) + 52px); width: 70px; }
+    }
+    /* Hochformat: Ziel-Anzeige in eine eigene Zeile unter die Knöpfe, Radar und Meldungen darunter */
+    @media (orientation: portrait) {
+      body.touch #exploreHud { top: 58px; }
+      body.touch #exploreHud .ex-compass { font-size: 14px; padding: 4px 12px; }
+      body.touch #radarContainer { top: 132px !important; }
+      body.touch #toasts { top: 132px; max-width: calc(100vw - 150px); }
+    }
+    /* Niedrige Querformat-Bildschirme (z. B. iPhone SE): Radar etwas kleiner, sonst berührt es den Spiral-Knopf */
+    @media (orientation: landscape) and (max-height: 400px) {
+      body.touch #radarContainer { width: 96px !important; height: 96px !important; }
+    }
     /* Besen-Extras im Erkundungsflug: Schild und Energieball (main.js flyHud), blauer Rand bei aktivem Schild */
     #flyHud { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: 18px; z-index: 17; display: none; padding: 6px 12px;
       border-radius: 10px; background: rgba(8,14,20,0.66); border-left: 3px solid transparent; color: #d9f3ff;
@@ -298,7 +335,7 @@
     #toasts .toast.leave { border-left-color: #8a96a3; color: #c9d1d9; }
     @keyframes toastIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
     body.touch #botbar, body.touch #topleft, body.touch #crosshair, body.touch #modeHeader { display: none !important; }
-    body.nokampf #botbar, body.nokampf #topleft, body.nokampf #crosshair { display: none !important; }
+    body.nokampf #botbar, body.nokampf #topleft, body.nokampf #crosshair, body.nokampf #reloadHint { display: none !important; }
     body.touch .overlay { overflow-y: auto; justify-content: safe center; padding: 10px 0; }
     body.touch #pauseArmoryBtn, body.touch #gameOverArmoryBtn { display: none !important; }
     @media (max-height: 520px) {
@@ -322,8 +359,7 @@
     <div id="vignette"></div>
 
     <!-- Flugbesen (Taste B): Ich-Ansicht = Bild des Users, darüber kurz die Steuerung. Liegt unter dem übrigen HUD. -->
-    <img id="broomView" src="./ui/besen.webp" alt="" draggable="false" style="display:none;position:fixed;left:50%;bottom:0;height:56vh;width:auto;transform:translateX(-50%);pointer-events:none;user-select:none;will-change:transform">
-    <div id="broomHelp" style="display:none;position:fixed;left:50%;top:64px;transform:translateX(-50%);max-width:92vw;padding:6px 14px;border-radius:8px;background:rgba(8,14,20,0.74);color:#d9f3ff;font:600 13px/1.45 system-ui,sans-serif;text-align:center;pointer-events:none;z-index:16">Maus 3 oder W: Schub · Shift: Boost · Maus lenkt · Mausrad: Spirale vor/zurück · Maus 1: Zauber · Leertaste/C: hoch/runter · B: absteigen — Q/E: Rolle · R/F: Looping · Z/U: Spirale · T: Trick</div>
+    <div id="broomHelp" style="display:none;position:fixed;left:50%;top:64px;transform:translateX(-50%);max-width:92vw;padding:6px 14px;border-radius:8px;background:rgba(8,14,20,0.74);color:#d9f3ff;font:600 13px/1.45 system-ui,sans-serif;text-align:center;pointer-events:none;z-index:16">Maus 3 oder W: Schub · Shift: Boost · Maus lenkt · Mausrad: Spirale vor/zurück · Maus 1: Zauber · Leertaste/C: hoch/runter · B: absteigen — Q/E: Rolle · R/F: Looping · Z/U: Spirale · T: Trick · L/H/J/K: Winken, Handstand, Hinlegen, Tanzen</div>
     <div id="flyHud"></div>
     <div id="shieldVignette"></div>
 
@@ -431,6 +467,10 @@
       <div class="ex-note">Flieg auf dem Besen durch den Ort und finde die goldenen Lichtsäulen. Jeder Ort gibt Punkte,
         alle zusammen einen Zeitbonus. Dein Name steht in der Bestenliste und über deinem Kopf, damit dich Mitspieler erkennen.</div>
       <input id="exName" maxlength="16" placeholder="Dein Name" autocomplete="nickname" spellcheck="false">
+      <div class="char-row" id="exChars">
+        <button class="btn char-tile" data-char="soldat"><img src="ui/besen.webp" alt=""><span>Soldat</span></button>
+        <button class="btn char-tile" data-char="hexe"><img src="ui/armory/hexe.webp" alt=""><span>Hexe</span></button>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
         <button class="btn primary" id="exSoloBtn" style="min-width:200px">▶ Allein fliegen</button>
         <button class="btn" id="exTeamBtn" style="min-width:200px">👥 Im Team fliegen</button>
@@ -572,6 +612,6 @@
     }
   }
   </script>
-  <script type="module" src="./src/main.js?v=67"></script>
+  <script type="module" src="./src/main.js?v=73"></script>
 </body>
 </html>

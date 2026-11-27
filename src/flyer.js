@@ -15,31 +15,47 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { createShield } from './shield.js?v=1';
-import { MOVE_ANIM, isMove, moveDur, moveQuat } from './flight-moves.js?v=1';
+import { MOVE_ANIM, isMove, moveDur, moveQuat } from './flight-moves.js?v=2';
 
-export const FLYER_URL = 'assets/models/soldier/SoldierBesen.glb';
-/** Kopfhöhe über dem Ursprung in der Ride-Haltung: so sitzt der Kopf dort, wo die Kamera des Mitspielers ist. */
-export const FLYER_HEAD = 1.5;
-/** Mündung relativ zum Kopf (Ride): so weit vor und unter der eigenen Kamera starten die eigenen Schüsse. */
-export const MUZZLE_FROM_EYE = { fwd: 1.27, down: 0.39 };
+/**
+ * Spielfiguren. head: Kopfhöhe über dem Ursprung in der Ride-Haltung (Kopf = Kamera des Mitspielers).
+ * muzzle: Mündung relativ zum Auge (vor / unter der Kamera), so starten die eigenen Schüsse.
+ * bodyCenter / bodyAxes: Treff-Ellipsoid in Koordinaten der Schild-Kugel (ohne Schild).
+ */
+export const CHARACTERS = {
+  soldat: {
+    name: 'Soldat', glb: 'assets/models/soldier/SoldierBesen.glb', img: 'ui/besen.webp',
+    head: 1.52, muzzle: { fwd: 1.386, down: 0.407 },
+    bodyCenter: [0, 0, 0], bodyAxes: [0.72, 0.714, 1.534].map((v) => v * Math.sqrt(0.8)),
+  },
+  hexe: {
+    name: 'Hexe', glb: 'assets/models/hexe/HexeBesen.glb', img: 'ui/armory/hexe.webp',
+    head: 1.655, muzzle: { fwd: 1.05, down: 0.728 },
+    bodyCenter: [-0.102, 0.148, 0.221], bodyAxes: [0.477, 0.912, 0.338],
+  },
+};
+export const CHAR_IDS = Object.keys(CHARACTERS);
+/** Unbekannte Kennung → Soldat. */
+export function charId(id) { return CHAR_IDS.includes(id) ? id : 'soldat'; }
 export const FIDGETS = ['FidgetStretch', 'FidgetYawn', 'FidgetTap'];
 /** Minigun: volle Drehzahl (timeScale von MinigunSpin), Anlaufen und Auslaufen in Sekunden. */
 export const SPIN_MAX = 5, SPIN_UP = 0.3, SPIN_DOWN = 1.0;
 export const MINIGUN_PARTS = ['Minigun', 'Minigun_Laeufe', 'Halterung'];
 const PIVOT = 1.06;                    // Hüfthöhe: Drehpunkt bei Manövern
 const LOOPS = ['Ride', 'Hover', 'LeanLeft', 'LeanRight', 'HoldTight', 'Roll', 'Boost'];
-const ONCE = ['Trick', 'Spit', ...FIDGETS];
+export const ONCE = ['Trick', 'Spit', 'Wave', 'Handstand', 'LieDown', 'Dance', ...FIDGETS];
 const FADE = 0.2, FADE_HOVER = 0.3;    // s Überblenden (von und zu Hover etwas weicher)
 const SHOOT_W = 0.6;                   // Gewicht der Rückstoß-Animation beim Dauerfeuer
-// Halbachsen der Schild-Kugel (Geometrie im Modell); ohne Schild zählt ein kleineres Ellipsoid um Reiter und Besen
-const SHIELD_AXES = new THREE.Vector3(0.72, 0.714, 1.534);
-const BODY_HIT = 0.8;                  // (x/a)² + (y/b)² + (z/c)² ≤ BODY_HIT ohne Schild, ≤ 1 mit (etwas großzügig, sonst trifft man kaum)
+// Treffer-Ellipsoide in Koordinaten der Schild-Kugel. Mit Schild: die Kugel selbst (Größe und Mitte aus der Geometrie
+// im Modell, createFlyer). Ohne Schild: festes Ellipsoid um Reiter und Besen (Halbachsen 0,72 / 0,714 / 1,534 der
+// früheren Kugel × √0,8, etwas großzügig, sonst trifft man kaum). Es bleibt fest, damit eine größere Kugel im Modell
+// die Figur nicht leichter treffbar macht.
 
 const AX = new THREE.Vector3(1, 0, 0), AY = new THREE.Vector3(0, 1, 0);
 
 /** Modell laden; die Schild-Kugel ist zunächst unsichtbar (shield.js schaltet sie). minigun: false blendet sie aus. */
-export async function loadFlyerTemplate(loader, { minigun = true } = {}) {
-  const gltf = await loader.loadAsync(FLYER_URL);
+export async function loadFlyerTemplate(loader, { minigun = true, url = CHARACTERS.soldat.glb } = {}) {
+  const gltf = await loader.loadAsync(url);
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false;
@@ -139,7 +155,9 @@ function createRig(mixer, clips) {
   };
 }
 
-export function createFlyer(template) {
+export function createFlyer(template, char = 'soldat') {
+  const ch = CHARACTERS[charId(char)];
+  const bodyAxes = new THREE.Vector3(...ch.bodyAxes), bodyCenter = new THREE.Vector3(...ch.bodyCenter);
   const g = new THREE.Group();
   const body = new THREE.Group();
   body.position.y = PIVOT;
@@ -162,11 +180,19 @@ export function createFlyer(template) {
 
   const qY = new THREE.Quaternion(), qP = new THREE.Quaternion(), qPi = new THREE.Quaternion(), qM = new THREE.Quaternion();
   const loc = new THREE.Vector3(), ro = new THREE.Vector3(), rd = new THREE.Vector3(), inv = new THREE.Matrix4();
+  // Schild-Kugel: Mitte und Halbachsen aus der Geometrie (lokal; Maßstab und Lage des Knotens kommen über die Matrix)
+  const sg = shield.mesh.geometry;
+  if (!sg.boundingBox) sg.computeBoundingBox();
+  const shC = sg.boundingBox.getCenter(new THREE.Vector3());
+  const shAx = sg.boundingBox.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  /** Punkt bzw. Richtung (lokal) in die Einheitskugel des gewählten Ellipsoids umrechnen. */
+  const toUnit = (p, shieldOn, isDir) => (shieldOn ? (isDir ? p : p.sub(shC)).divide(shAx)
+    : (isDir ? p : p.sub(bodyCenter)).divide(bodyAxes));
   let rp = null;                       // nachgespieltes Manöver
   let lastAnim = 'Ride', spin = 0;
 
   return {
-    g, body, model, shield, mouth, muzzle, mixer, rig,
+    g, body, model, shield, mouth, muzzle, mixer, rig, char: charId(char), head: ch.head,
     ownMats: [shield.mesh.material],
     get replaying() { return rp ? rp.move : ''; },
     /** Läufe voll angelaufen und Abzug gedrückt: es wird geschossen (Mündungsfeuer, Leuchtspur). */
@@ -175,7 +201,7 @@ export function createFlyer(template) {
     /** Manöver des Mitspielers nachspielen (Nachricht „move“). pitch = sein Blick beim Start. */
     playMove(move, dir, pitch = 0) {
       if (!isMove(move, dir)) return;
-      if (move === 'trick') rig.playOnce('Trick');
+      if (ONCE.includes(MOVE_ANIM[move])) rig.playOnce(MOVE_ANIM[move]);   // Trick, Winken, Handstand, Hinlegen, Tanzen
       rp = { move, dir, t: 0, dur: moveDur(move, dir), p0: pitch };
     },
     /** Einmal-Animation (Spit, Trick). */
@@ -196,13 +222,17 @@ export function createFlyer(template) {
       if (FIDGETS.includes(rig.once) && anim !== rig.once) rig.abortOnce();
       lastAnim = anim;
       const moveAnim = rp ? MOVE_ANIM[rp.move] : '';
+      return this.animate(dt, moveAnim, anim, s);
+    },
+    /** Animation, Schild und Minigun (auch für die eigene Figur in der Ich-Ansicht, dort ohne Drehung). */
+    animate(dt, moveAnim, anim, s) {
       const base = LOOPS.includes(moveAnim) ? moveAnim : (LOOPS.includes(anim) ? anim : (anim === 'Spit' || FIDGETS.includes(anim) ? 'Hover' : 'Ride'));
       // Minigun: anlaufen, solange der Abzug gedrückt ist, sonst langsam auslaufen
       const trig = hasGun && !!s.mg;
       spin = trig ? Math.min(SPIN_MAX, spin + dt * SPIN_MAX / SPIN_UP) : Math.max(0, spin - dt * SPIN_MAX / SPIN_DOWN);
       this.firing = trig && spin >= SPIN_MAX * 0.9;
       rig.update(dt, base, s.lean || 0, this.firing, spin);
-      flickerFlash(flash, this.firing);
+      flickerFlash(flash, this.firing, s.fs || 1);
       shield.setVisible(!!s.sh);
       if (s.sh) shield.setEnergy(typeof s.she === 'number' ? s.she : 1);
       shield.update(dt);
@@ -218,17 +248,15 @@ export function createFlyer(template) {
     hitTest(point, shieldOn) {
       loc.copy(point);
       shield.mesh.worldToLocal(loc);
-      loc.divide(SHIELD_AXES);
-      return loc.lengthSq() <= (shieldOn ? 1 : BODY_HIT);
+      return toUnit(loc, shieldOn, false).lengthSq() <= 1;
     },
     /** Strahl (origin, dir normiert) gegen dasselbe Ellipsoid: Abstand bis zum Eintritt oder -1. */
     rayHit(origin, dir, shieldOn) {
       inv.copy(shield.mesh.matrixWorld).invert();
       ro.copy(origin).applyMatrix4(inv);
       rd.copy(origin).add(dir).applyMatrix4(inv).sub(ro);          // Richtung mit, nicht normieren: t bleibt in Metern
-      ro.divide(SHIELD_AXES); rd.divide(SHIELD_AXES);
-      const k = shieldOn ? 1 : BODY_HIT;
-      const a = rd.dot(rd), b = 2 * ro.dot(rd), c = ro.dot(ro) - k, disc = b * b - 4 * a * c;
+      toUnit(ro, shieldOn, false); toUnit(rd, shieldOn, true);
+      const a = rd.dot(rd), b = 2 * ro.dot(rd), c = ro.dot(ro) - 1, disc = b * b - 4 * a * c;
       if (disc < 0) return -1;
       const t = (-b - Math.sqrt(disc)) / (2 * a);
       return t > 0 ? t : (c < 0 ? 0 : -1);                            // c < 0: Start schon innen

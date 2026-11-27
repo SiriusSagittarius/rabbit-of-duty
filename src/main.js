@@ -7,14 +7,15 @@ import { Net } from './net.js?v=4';
 import { AudioManager } from './audio.js?v=5';
 import { Music } from './music.js?v=3';
 import { Arsenal, buildGrenadeMesh } from './arsenal.js?v=7';
-import { createBroom, BROOM_SPEED, BROOM_BOOST } from './broom.js?v=5';
+import { createBroom, BROOM_SPEED, BROOM_BOOST } from './broom.js?v=6';
 import { createAutopilot } from './autopilot.js?v=1';
-import { createGuide } from './guide.js?v=2';
+import { createGuide } from './guide.js?v=4';
 import { createWishlist } from './wishlist.js?v=3';
 import { createEnergyBalls } from './energyball.js?v=1';
-import { loadFlyerTemplate, createFlyer, createMuzzleFlash, flickerFlash, FLYER_HEAD, MUZZLE_FROM_EYE, FIDGETS, SPIN_MAX, SPIN_UP, SPIN_DOWN } from './flyer.js?v=3';
+import { loadFlyerTemplate, createFlyer, createMuzzleFlash, flickerFlash, CHARACTERS, CHAR_IDS, charId, FIDGETS, ONCE, SPIN_MAX, SPIN_UP, SPIN_DOWN } from './flyer.js?v=6';
+import { MOVE_ANIM, MOVE_THIRD_PERSON } from './flight-moves.js?v=2';
 import { createExplore } from './explore.js?v=3';
-import { createTouch, isTouchDevice } from './touch.js?v=3';
+import { createTouch, isTouchDevice } from './touch.js?v=6';
 import { buildAtriumLevel } from './atrium-level.js?v=3';
 import { buildOsmLevel, showOsmCredit } from './osm-level.js?v=32';
 import { pointInPoly, closestOnPoly, segHitsPoly } from './poly2d.js';
@@ -27,7 +28,10 @@ import { createPresence } from './presence.js?v=1';
 
 // 3D-Shooter Soldaten-Template (GLTF-Modell mit Skelett & Animationen)
 let soldierTemplate = null;
-let flyerTemplate = null;            // Mitflieger: Soldat auf dem Besen (src/flyer.js, SoldierBesen.glb)
+const flyerTemplates = {};            // Mitflieger je Figur: Soldat (SoldierBesen.glb) und Hexe (HexeBesen.glb), src/flyer.js
+let selChar = charId(localStorage.getItem('rod.char'));   // eigene Figur (Standard Soldat)
+/** Template der Figur (Soldat als Ersatz, falls die Hexe nicht geladen werden konnte). */
+const tmplOf = (c) => flyerTemplates[c] || flyerTemplates.soldat || null;
 let zombieTemplate = null;     // echtes Zombie-Modell (verschlüsselt in assets/models/zombie/, siehe README) – fehlt es, gibt es Ersatz-Zombies
 
 // ----------------------------------------------------------------------------
@@ -630,6 +634,7 @@ if (TOUCH) document.body.classList.add('touch');
 const touch = createTouch({
   onPause: () => { if (state === 'playing') { state = 'paused'; setOverlay(); showPauseButtons(); } },
   onSpiral: () => broom.wheel(1),
+  onTrick: (move) => broom.startMove(move, ''),
   onNav: () => { if (state === 'playing') openNavMap(); },
 });
 // Erkundungsflug: Orte entdecken ohne Gegner, allein oder im Team (src/explore.js)
@@ -637,16 +642,16 @@ const explore = createExplore({ scene, groundAt, banner: showBanner, chime: () =
 let exploreTeam = false;                     // im Erkundungsraum des Servers (statt Deathmatch-Arena)
 const BROOM_HELP = $('broomHelp')?.textContent || '';
 const BROOM_HELP_EXPLORE = 'W oder Maus 3: Schub · Shift: Boost · Maus lenkt · S: bremsen · Leertaste/C: hoch/runter · Esc: Pause'
-  + ' — Q/E: Rolle · R/F: Looping · Z/U: Spirale · Mausrad: Korkenzieher · T: Trick · V/rechte Maustaste: Energieball · X: Schild'
+  + ' — Q/E: Rolle · R/F: Looping · Z/U: Spirale · Mausrad: Korkenzieher · T: Trick · L: Winken · H: Handstand · J: Hinlegen · K: Tanzen · V/rechte Maustaste: Energieball · X: Schild'
   + ' · linke Maustaste: Minigun · N: Karte & Navi · P: Autopilot';
 // Vor dem ersten loadMap() anlegen: loadMap, resetRun und gameOver räumen den Besen auf.
-// Flugbesen (Taste B, siehe broom.js). Die Ich-Ansicht ist das Bild des Users, ui/besen.webp.
+// Flugbesen (Taste B, siehe broom.js). In der Ich-Ansicht sieht man die eigene 3D-Figur (selfUpdate).
 const broom = createBroom({
   camera, audio, groundAt, player,
-  overlay: $('broomView'), help: $('broomHelp'),
+  help: $('broomHelp'),
   onCast: (from) => hitscanShot(34, { from, color: '#8fe3ff', thick: 1.8, worldColor: '#8fe3ff', life: 0.14 }),
   // Manöver gestartet: die Mitflieger spielen dieselbe Kurve und Animation nach (flyer.js)
-  onMove: (m) => sendFlyFx({ type: 'move', move: m.move, dir: m.dir, startTime: Date.now(), pitch: +m.pitch.toFixed(3) }),
+  onMove: (m) => { const a = MOVE_ANIM[m.move]; if (ONCE.includes(a)) me.f?.playOnce(a); sendFlyFx({ type: 'move', move: m.move, dir: m.dir, startTime: Date.now(), pitch: +m.pitch.toFixed(3) }); },
 });
 function toggleBroom() {
   if (state !== 'playing') return;
@@ -681,6 +686,7 @@ const balls = createEnergyBalls({ scene, groundAt, solidAt, onImpact: (p) => imp
 const FLY_KEYS = {                                           // Tastenposition (e.code); Z und Y beide für QWERTZ/QWERTY
   KeyQ: ['roll', 'left'], KeyE: ['roll', 'right'], KeyR: ['looping', 'fwd'], KeyF: ['looping', 'back'],
   KeyZ: ['spiral', 'left'], KeyY: ['spiral', 'left'], KeyU: ['spiral', 'right'], KeyT: ['trick', ''],
+  KeyL: ['wave', ''], KeyH: ['handstand', ''], KeyJ: ['liedown', ''], KeyK: ['dance', ''],
 };
 const _fd = new THREE.Vector3(), _fu = new THREE.Vector3(), _fp = new THREE.Vector3();
 const arr3 = (v) => [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)];
@@ -695,6 +701,65 @@ function flyKey(e){
   if (e.code === 'KeyX') { if (!e.repeat) shieldOn(); return true; }
   return false;
 }
+// ---------- Eigene Figur in der Ich-Ansicht (BESEN-AUFGABEN.md 6 und 7) ----------
+// Statt eines Bildes sitzt man in der eigenen 3D-Figur: Die Kamera steht am Knoten Kamera_FP, der eigene Kopf ist
+// winzig skaliert (Hut und Haare der Hexe hängen am Kopf und verschwinden mit), der Schild bleibt aus. Bei Handstand,
+// Hinlegen und Tanzen schwenkt die Kamera kurz nach hinten (me.tp 0 … 1), sonst hinge sie im Körper.
+const me = { f: null, char: '', head: null, cam: null, tp: 0, anim: '' };
+const _sv = new THREE.Vector3(), _sv2 = new THREE.Vector3(), _sq = new THREE.Quaternion(), _sm = new THREE.Matrix4();
+const _camSave = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
+function selfShown(){ return !!(me.f && me.f.g.visible); }
+function selfFlyer(){
+  if (me.f && me.char === selChar) return me.f;
+  if (me.f) { scene.remove(me.f.g); me.f = null; }
+  const t = tmplOf(selChar); if (!t) return null;
+  const f = createFlyer(t, selChar);
+  f.g.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
+  me.head = f.model.getObjectByName('mixamorigHead') || f.model.getObjectByName('mixamorig:Head');
+  me.cam = f.model.getObjectByName('Kamera_FP');
+  f.g.visible = false;
+  scene.add(f.g);
+  me.f = f; me.char = selChar; me.anim = '';
+  return f;
+}
+/** Ein Bild, nach Flug und Kollision: Figur animieren und so hinstellen, dass Kamera_FP auf der Kamera sitzt. */
+function selfUpdate(dt){
+  const on = broom.active;
+  const f = on ? selfFlyer() : me.f;
+  if (!f) return;
+  f.g.visible = on;
+  if (!on) { me.tp = 0; if (me.head) me.head.scale.setScalar(1); return; }
+  const tpWant = broom.moving && MOVE_THIRD_PERSON.has(broom.move) ? 1 : 0;
+  me.tp += (tpWant - me.tp) * (1 - Math.exp(-6 * dt));
+  if (Math.abs(me.tp - tpWant) < 0.002) me.tp = tpWant;
+  // Spucken und Fidgets laufen als Einmal-Animation (Manöver startet onMove)
+  const anim = broom.moving ? broom.anim : (fly.spitT > 0 ? 'Spit' : (fly.fidget || broom.anim));
+  if (anim !== me.anim && !broom.moving && ONCE.includes(anim) && f.rig.once !== anim) f.playOnce(anim);
+  if (FIDGETS.includes(f.rig.once) && anim !== f.rig.once) f.rig.abortOnce();
+  me.anim = anim;
+  f.animate(dt, broom.moving ? MOVE_ANIM[broom.move] : '', anim,
+    { lean: broom.lean, sh: me.tp > 0.5 && fly.shOn, she: fly.shE, mg: MINIGUN_AN && fly.mgFire, fs: 0.3 });
+  if (me.head) me.head.scale.setScalar(me.tp > 0.3 ? 1 : 0.001);   // nach mixer.update, sonst setzt die Animation ihn zurück
+  f.body.quaternion.copy(camera.quaternion);
+  f.g.position.set(0, 0, 0);
+  f.g.updateMatrixWorld(true);
+  if (me.cam) me.cam.getWorldPosition(_sv); else _sv.set(0, f.head, 0);
+  f.g.position.copy(camera.position).sub(_sv);
+  f.g.updateMatrixWorld(true);
+}
+/** Vor dem Rendern: bei me.tp > 0 die Kamera nach hinten oben schwenken (danach selfCamRestore). */
+function selfCamPush(){
+  if (!selfShown() || me.tp <= 0.001) return false;
+  _camSave.p.copy(camera.position); _camSave.q.copy(camera.quaternion);
+  me.f.center(_sv2);
+  _sv.set(Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(3.6).add(_sv2); _sv.y += 1.1;   // hinter und über der Figur
+  _sm.lookAt(_sv, _sv2, camera.up); _sq.setFromRotationMatrix(_sm);
+  camera.position.lerp(_sv, me.tp);
+  camera.quaternion.slerp(_sq, me.tp);
+  camera.updateMatrixWorld();
+  return true;
+}
+function selfCamRestore(){ camera.position.copy(_camSave.p); camera.quaternion.copy(_camSave.q); camera.updateMatrixWorld(); }
 function sendFlyFx(d){ if (exploreTeam && net.connected) net.sendFx(d); }
 /** Steckt der Punkt in einem Gebäude (Grundriss mit Unter- und Oberkante)? Für die Energiebälle. */
 function solidAt(x, y, z){
@@ -795,7 +860,7 @@ function flyUpdate(dt){
   const mgOn = trig && fly.mgSpin >= SPIN_MAX * 0.9;
   if (mgOn) { fly.mgShotT -= dt; while (fly.mgShotT <= 0) { fly.mgShotT += 1 / MG_RATE; mgShot(); } } else fly.mgShotT = 0;
   if (mgOn) localMuzzle(mgFlash.position);
-  flickerFlash(mgFlash, mgOn, 0.3);
+  flickerFlash(mgFlash, mgOn && !selfShown(), 0.3);   // mit eigener Figur blitzt deren Mündung
   mgWhine(fly.mgSpin / SPIN_MAX);
   if ((fly.mgFlushT -= dt) <= 0) { fly.mgFlushT = MG_FLUSH; if (fly.mgHits.size) flushMgHits(); }
   // Stillstand: alle 8–15 s ein Fidget (Strecken, Gähnen, Klopfen) – sehen die Mitflieger über den Animationsnamen
@@ -804,7 +869,7 @@ function flyUpdate(dt){
   else if (fly.fidget) { if ((fly.fidgetT -= dt) <= 0) { fly.fidget = ''; fly.fidgetWait = 8 + Math.random() * 7; } }
   else if ((fly.fidgetWait -= dt) <= 0) {
     fly.fidget = FIDGETS[Math.floor(Math.random() * FIDGETS.length)];
-    fly.fidgetT = flyerTemplate?.fidgetDur?.[fly.fidget] || 2.4;
+    fly.fidgetT = tmplOf(selChar)?.fidgetDur?.[fly.fidget] || 2.4;
   }
   document.body.classList.toggle('shield-on', fly.shOn);
   if ((fly.hudT -= dt) <= 0) flyHud();
@@ -832,7 +897,7 @@ function friendList(){
   if (!exploreTeam || !net.connected) return out;
   for (const [id, a] of remoteAvatars) {
     const p = net.getPlayer(id); if (!p) continue;
-    out.push({ id, name: p.name || 'Mitflieger', x: a.g.position.x, y: a.g.position.y + (a.flyer ? FLYER_HEAD : 1.6), z: a.g.position.z,
+    out.push({ id, name: p.name || 'Mitflieger', x: a.g.position.x, y: a.g.position.y + (a.flyer ? a.head : 1.6), z: a.g.position.z,
       ry: p.ry || 0, vel: a.vel || _apZero });
   }
   return out;
@@ -903,11 +968,13 @@ function onFlyFx(d){
 // gemeldet: ohne Schild bremst das kurz ab, mit Schild kostet jede Kugel etwas Schildenergie. Lebenspunkte gibt es nicht.
 const _md = new THREE.Vector3(), _mu = new THREE.Vector3(), _mo = new THREE.Vector3(), _me = new THREE.Vector3(), _mt = new THREE.Vector3();
 const mgFlash = createMuzzleFlash(); scene.add(mgFlash);
-/** Eigene Mündung: so weit vor und unter der Kamera wie beim Modell (flyer.js MUZZLE_FROM_EYE). */
+/** Eigene Mündung: so weit vor und unter der Kamera wie beim Modell der gewählten Figur (flyer.js CHARACTERS.muzzle). */
 function localMuzzle(out){
+  if (selfShown()) return me.f.muzzlePos(out);           // eigene Figur sichtbar: Mündung aus dem Knoten
   camera.getWorldDirection(_md);
   _mu.set(0, 1, 0).applyQuaternion(camera.quaternion);
-  return out.copy(camera.position).addScaledVector(_md, MUZZLE_FROM_EYE.fwd).addScaledVector(_mu, -MUZZLE_FROM_EYE.down);
+  const m = CHARACTERS[selChar].muzzle;
+  return out.copy(camera.position).addScaledVector(_md, m.fwd).addScaledVector(_mu, -m.down);
 }
 function mgShot(){
   localMuzzle(_mo);
@@ -1898,6 +1965,7 @@ function setOverlay(){ music.setMode(state==='playing' ? 'game' : (state==='paus
   ui.gameover.style.display = state==='over'?'flex':'none';
   const fin = $('pauseFinishBtn'); if (fin) fin.style.display = (gameMode === 'explore' && explore.active) ? '' : 'none';
   touch.show(TOUCH && state === 'playing');
+  document.body.classList.toggle('playing', state === 'playing');   // CSS: Radar auf dem Handy nur im Flug
   syncMusicUi(); }
 /** Spiel aufnehmen: am PC per Pointer-Lock (pointerlockchange setzt 'playing'), auf dem Handy direkt. */
 function lock(){
@@ -2200,7 +2268,7 @@ function update(dt){
       ? (isSniper ? zoomFov : 50)
       : (sprint && moving ? 82 : 75);
 
-  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 1 - Math.pow(0.001, dt));
+  camera.fov = THREE.MathUtils.lerp(camera.fov, portraitFov(targetFov), 1 - Math.pow(0.001, dt));
   camera.updateProjectionMatrix();
 
   // Sniper-Scope Overlay anzeigen, wenn mit Scharfschützengewehr gezielt wird
@@ -2873,6 +2941,7 @@ function frame(now){
     }
     arsenal.update(dt, { speed: 0, grounded: true, sprinting: false, moving: false, aiming: false });
   }
+  selfUpdate(state === 'playing' ? dt : 0);         // eigene Figur in der Ich-Ansicht (steht still in der Pause)
   updateRadar(dt);
   const currentWpn = arsenal.currentWeapon;
   const isSniper = Boolean(currentWpn?.scope);
@@ -2890,8 +2959,10 @@ function renderFrame(){
   const q = gpuTimerBegin();
   try {
     renderer.clear();
+    const tp = selfCamPush();                    // Handstand, Hinlegen, Tanzen: kurz von hinten zuschauen
     renderer.render(scene, camera);
-    if (!broom.active && !TOUCH && KAMPF_SICHTBAR) arsenal.render(renderer);   // Besen: Hände halten den Besen (Bild); Handy/ohne Kampf: nie Waffen
+    if (tp) selfCamRestore();
+    if (!broom.active && !TOUCH && KAMPF_SICHTBAR) arsenal.render(renderer);   // Besen: eigene Figur (selfUpdate); Handy/ohne Kampf: nie Waffen
   } finally { gpuTimerEnd(q); }
   adaptResolution();
 }
@@ -3014,6 +3085,16 @@ function uploadMapGeometry(){
   }
   renderer.setRenderTarget(prevTarget);
   for (const [o, fc, g, vis] of saved) { o.frustumCulled = fc; o.geometry = g; o.visible = vis; }
+}
+
+/**
+ * Hochformat (Handy hochkant): Three.js hält den senkrechten Blickwinkel fest, zur Seite sah man dann nur noch einen
+ * schmalen Streifen. Den senkrechten Winkel so weit öffnen, dass zur Seite wieder mehr zu sehen ist (höchstens 110°).
+ */
+function portraitFov(fov){
+  if (camera.aspect >= 1) return fov;
+  const t = Math.tan(THREE.MathUtils.degToRad(fov / 2)) / Math.sqrt(camera.aspect);
+  return Math.min(110, THREE.MathUtils.radToDeg(2 * Math.atan(t)));
 }
 
 addEventListener('resize', ()=>{
@@ -3279,20 +3360,23 @@ async function bootUp(){
     loadMap(currentMapId);
     await new Promise(r=>setTimeout(r, 80));
 
-    boot.say('Arsenal initialisieren…'); boot.prog(0.4);
-    try {
-      await arsenal.init();
-    } catch (e) {
-      console.warn('Arsenal init:', e);
+    // Waffen-Modelle nur laden, wenn es Kampfmodi gibt: ohne sie hält niemand eine Waffe (spart ~3 MB vor dem Menü)
+    if (KAMPF_SICHTBAR) {
+      boot.say('Arsenal initialisieren…'); boot.prog(0.4);
+      try {
+        await arsenal.init();
+      } catch (e) {
+        console.warn('Arsenal init:', e);
+      }
     }
 
     boot.say(KAMPF_SICHTBAR ? 'Soldaten-Gegner laden…' : 'Mitflieger laden…'); boot.prog(0.7);
     const gltfLoader = new GLTFLoader();
-    try {
-      flyerTemplate = await loadFlyerTemplate(gltfLoader, { minigun: MINIGUN_AN });
-      console.log('✅ Mitflieger (Soldat auf dem Besen) geladen:', flyerTemplate.animations.map(a => a.name).join(', '));
+    for (const c of CHAR_IDS) try {
+      flyerTemplates[c] = await loadFlyerTemplate(gltfLoader, { minigun: MINIGUN_AN, url: CHARACTERS[c].glb });
+      console.log('✅ Mitflieger (' + CHARACTERS[c].name + ' auf dem Besen) geladen');
     } catch (e) {
-      console.warn('Mitflieger-Modell nicht ladbar – Ersatzfigur:', e);
+      console.warn('Mitflieger-Modell ' + c + ' nicht ladbar – Ersatzfigur:', e);
     }
     if (KAMPF_SICHTBAR) try {                         // Soldaten-Gegner und Deathmatch-Gegner (Soldier.glb)
       const gltf = await gltfLoader.loadAsync('assets/models/soldier/Soldier.glb');
@@ -3425,10 +3509,21 @@ function makeAvatar(){
   return { g, hitbox, mixer, idleAction, walkAction, current: 'idle', ownMats };
 }
 /** Mitflieger im Erkundungsflug: Soldat auf dem Besen mit Animationen und Schild (src/flyer.js). */
-function makeFlyerAvatar(){
-  const f = createFlyer(flyerTemplate);
+// Farbton je Mitflieger: gleiche Figur zweimal sieht etwas anders aus (fester Ton aus der Sitzungs-Kennung)
+const TINTS = [[1, 1, 1], [1, 0.72, 0.78], [0.72, 0.86, 1], [0.78, 1, 0.72], [1, 0.92, 0.6]];
+function tintOf(id){ let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) | 0; return TINTS[Math.abs(h) % TINTS.length]; }
+function makeFlyerAvatar(char, id){
+  const f = createFlyer(tmplOf(char), char);
+  const ownMats = f.ownMats.slice();
+  const tint = tintOf(id);
+  if (tint !== TINTS[0]) f.model.traverse((o) => {       // eigene Materialkopien, damit die Vorlage unverändert bleibt
+    if (!o.isMesh || o.name === 'Schild') return;
+    const src = o.material, list = Array.isArray(src) ? src : [src];
+    const cl = list.map((m) => { const c = m.clone(); if (c.color) c.color.multiply(new THREE.Color(tint[0], tint[1], tint[2])); ownMats.push(c); return c; });
+    o.material = Array.isArray(src) ? cl : cl[0];
+  });
   scene.add(f.g);
-  return { g: f.g, hitbox: new THREE.Object3D(), flyer: f, mixer: null, ownMats: f.ownMats };   // hitbox nur der Form halber
+  return { g: f.g, hitbox: new THREE.Object3D(), flyer: f, char: f.char, head: f.head, mixer: null, ownMats };   // hitbox nur der Form halber
 }
 function clearRemotes(){
   for(const [,a] of remoteAvatars) {
@@ -3445,14 +3540,20 @@ function syncRemote(dt){
   players.forEach((p, id)=>{
     if(id===net.sessionId) return;
     let a = remoteAvatars.get(id);
-    if(!a){ a = exploreTeam && flyerTemplate ? makeFlyerAvatar() : makeAvatar(); a.hitbox.userData.remoteId=id;
-      a.g.position.set(p.x, exploreTeam ? p.y - (a.flyer ? FLYER_HEAD : 1.6) : 0, p.z); remoteAvatars.set(id,a); remoteHitboxes.push(a.hitbox);
+    const pc = charId(p.char);
+    if (a && a.flyer && a.char !== pc) {                   // Figur gewechselt: altes Modell entfernen, unten neu bauen
+      scene.remove(a.g); for (const m of (a.ownMats || [])) m.dispose();
+      const i = remoteHitboxes.indexOf(a.hitbox); if (i >= 0) remoteHitboxes.splice(i, 1);
+      remoteAvatars.delete(id); a = null;
+    }
+    if(!a){ a = exploreTeam && tmplOf(pc) ? makeFlyerAvatar(pc, id) : makeAvatar(); a.hitbox.userData.remoteId=id;
+      a.g.position.set(p.x, exploreTeam ? p.y - (a.flyer ? a.head : 1.6) : 0, p.z); remoteAvatars.set(id,a); remoteHitboxes.push(a.hitbox);
       if (exploreTeam) decorateFlyer(a); }
     const prevX = a.g.position.x, prevZ = a.g.position.z;
     const k = Math.min(1, dt*12);                          // sanftes Nachziehen der Netz-Position
     a.g.position.x += (p.x - a.g.position.x)*k;
     a.g.position.z += (p.z - a.g.position.z)*k;
-    a.g.position.y = exploreTeam ? a.g.position.y + (p.y - (a.flyer ? FLYER_HEAD : 1.6) - a.g.position.y) * k   // Flug: echte Höhe (auch unter 0)
+    a.g.position.y = exploreTeam ? a.g.position.y + (p.y - (a.flyer ? a.head : 1.6) - a.g.position.y) * k   // Flug: echte Höhe (auch unter 0)
       : Math.max(0, p.y - 1.6);                            // Server-y ist Augenhöhe (1.6); Avatar steht am Boden
     if (a.flyer) {                                         // Besen-Flieger: Drehung, Animationen, Schild, Minigun (flyer.js)
       a.flyer.update(dt, p);
@@ -3492,7 +3593,7 @@ function decorateFlyer(a){
   const c = document.createElement('canvas'); c.width = 512; c.height = 96;
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, sizeAttenuation: false, transparent: true });
-  const tag = new THREE.Sprite(mat); tag.scale.set(0.3, 0.056, 1); tag.position.y = a.flyer ? FLYER_HEAD + 0.75 : 2.7; tag.renderOrder = 999;
+  const tag = new THREE.Sprite(mat); tag.scale.set(0.3, 0.056, 1); tag.position.y = a.flyer ? a.head + 0.75 : 2.7; tag.renderOrder = 999;
   a.g.add(tag);
   a.ownMats.push(mat);
   a.tag = { c, tex, last: '' };
@@ -3567,6 +3668,7 @@ function loginBox(box, { note, okText, onDone } = {}){
 function openExploreDialog(){
   $('exName').value = localStorage.getItem('rod.name') || '';
   $('exMsg').textContent = '';
+  paintCharTiles();
   loginBox($('exLogin'), { okText: '✓ Mit Google angemeldet – dein Ergebnis kommt am Ende in die Bestenliste' });
   $('exploreDialog').style.display = 'flex';
   if (!TOUCH) setTimeout(() => $('exName').focus(), 30);
@@ -3588,7 +3690,7 @@ function beginExplore(team){
   if (team) {
     exploreTeam = true;
     showBanner('VERBINDE MIT DEM TEAM …');
-    net.connect(net.defaultUrl(), name, 'explore', { map: currentMapId })
+    net.connect(net.defaultUrl(), name, 'explore', { map: currentMapId, char: selChar })
       .then(() => { if (!exploreTeam) { net.disconnect(); return; } exLastSend = 0; showBanner('IM TEAM – ' + (net.players ? net.players.size : 1) + ' AN BORD'); })
       .catch((err) => { console.warn('[explore] Team-Server nicht erreichbar', err); exploreTeam = false; showBanner('TEAM-SERVER NICHT ERREICHBAR – DU FLIEGST ALLEIN'); });
   }
@@ -3600,6 +3702,11 @@ function finishExplore(){
 }
 explore.onFound = (p) => { if (exploreTeam && net.connected) net.sendFound(p.id); };
 explore.onComplete = () => { if (state === 'playing' || state === 'paused') finishExplore(); };
+// Figurwahl im Erkundungsdialog: Kacheln, Auswahl in localStorage (rod.char)
+function paintCharTiles(){ document.querySelectorAll('#exChars .char-tile').forEach((b) => b.classList.toggle('sel', b.dataset.char === selChar)); }
+document.querySelectorAll('#exChars .char-tile').forEach((b) => b.addEventListener('click', (e) => {
+  e.stopPropagation(); selChar = charId(b.dataset.char); localStorage.setItem('rod.char', selChar); paintCharTiles();
+}));
 $('exSoloBtn').addEventListener('click', (e) => { e.stopPropagation(); beginExplore(false); });
 $('exTeamBtn').addEventListener('click', (e) => { e.stopPropagation(); beginExplore(true); });
 $('exBackBtn').addEventListener('click', (e) => { e.stopPropagation(); $('exploreDialog').style.display = 'none'; });
@@ -3670,7 +3777,7 @@ setTimeout(() => presence.start(localStorage.getItem('rod.name') || ''), 1200);
 window.__ROD__ = {
   camera, scene, renderer, arsenal, audio, music, player, damageFeedback, meleeAttack,
   crates, gameOver, broom, explore, touch, net,
-  balls, fly, remoteAvatars, spit, shieldOn, get flyerTemplate(){return flyerTemplate;},
+  balls, fly, remoteAvatars, spit, shieldOn, get flyerTemplate(){return tmplOf('soldat');},
   nav, ap, pilot, autopilotOn, autopilotOff, friendList, ceilingAt,
   get exploreTeam(){return exploreTeam;},
   get yaw(){return yaw;}, get pitch(){return pitch;},

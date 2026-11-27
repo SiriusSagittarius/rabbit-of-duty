@@ -34,3 +34,7 @@ assets/imgmuch/
 server/data/
 MAILSERVER-AUFGABEN.md
 FLYINGMUCH-EMAIL.md
+
+# --- Große lokale Pakete und Blender-Sicherungen ---
+assets.zip
+*.blend1

@@ -18,8 +18,14 @@ const smooth = (t) => t * t * (3 - 2 * t);
 const qa = new THREE.Quaternion(), qb = new THREE.Quaternion();
 
 /** Animation der Figur je Manöver (SoldierBesen.glb). */
-export const MOVE_ANIM = { looping: 'HoldTight', roll: 'Roll', spiral: 'Roll', trick: 'Trick' };
-export const MOVE_DIRS = { looping: ['fwd', 'back'], roll: ['left', 'right'], spiral: ['left', 'right', 'fwd', 'back'], trick: [''] };
+export const MOVE_ANIM = { looping: 'HoldTight', roll: 'Roll', spiral: 'Roll', trick: 'Trick',
+  wave: 'Wave', handstand: 'Handstand', liedown: 'LieDown', dance: 'Dance' };
+export const MOVE_DIRS = { looping: ['fwd', 'back'], roll: ['left', 'right'], spiral: ['left', 'right', 'fwd', 'back'], trick: [''],
+  wave: [''], handstand: [''], liedown: [''], dance: [''] };
+/** Kunststücke ohne Flugbahn: nur die Animation (Winken, Handstand, Hinlegen, Tanzen; 30 fps im Modell). */
+export const POSE_MOVES = { wave: 42 / 30, handstand: 80 / 30, liedown: 78 / 30, dance: 80 / 30 };
+/** Bei diesen sitzt die Ich-Kamera im Körper: solange von hinten zuschauen. */
+export const MOVE_THIRD_PERSON = new Set(['handstand', 'liedown', 'dance']);
 
 export function isMove(move, dir) { return !!MOVE_DIRS[move] && MOVE_DIRS[move].includes(dir); }
 
@@ -28,6 +34,7 @@ export function moveDur(move, dir) {
   if (move === 'looping') return 1.4;
   if (move === 'roll') return 1.0;
   if (move === 'spiral') return dir === 'fwd' || dir === 'back' ? 0.8 : 1.5;
+  if (POSE_MOVES[move]) return POSE_MOVES[move];
   return 1.3;                                       // Trick: so lang wie die Animation
 }
 

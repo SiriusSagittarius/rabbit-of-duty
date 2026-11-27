@@ -8,11 +8,12 @@
 //   Shift                           Boost (schneller)
 // Manöver (Tasten in main.js): Looping, Fassrolle, Steilspirale, Trick – die Kurven stehen in flight-moves.js,
 // damit die Mitflieger auf dem anderen Rechner dieselbe Bewegung sehen (flyer.js).
-// Die Ich-Ansicht ist das Bild des Users (ui/besen.webp), das Fluggeräusch seine Datei audio/blow.mp3.
+// Die Ich-Ansicht zeigt die eigene 3D-Figur (main.js selfUpdate, Kamera am Knoten Kamera_FP), das Fluggeräusch ist
+// die Datei des Users audio/blow.mp3.
 // Zauber, Spirale und Auf-/Absteigen sind kleine Synthesizer-Töne. Gebäude und Bäume halten die vorhandene
 // Kollision auf (main.js collide, mit Ober- und Unterkante). Über Dächer fliegt man einfach hinweg.
 import * as THREE from 'three';
-import { MOVE_ANIM, isMove, moveDur, moveReplacesFlight, moveRadius, moveQuat, moveOffset, moveFov, moveFrame } from './flight-moves.js?v=1';
+import { MOVE_ANIM, isMove, moveDur, moveReplacesFlight, moveRadius, moveQuat, moveOffset, moveFov, moveFrame } from './flight-moves.js?v=2';
 
 const MAX_SPEED = 28;            // m/s mit Schub, gut 100 km/h
 const FOLLOW_THRUST = 1.7;       // wie schnell die Geschwindigkeit dem Ziel folgt (pro Sekunde): mit Schub …
@@ -32,7 +33,7 @@ const AXIS_Z = new THREE.Vector3(0, 0, 1);
 export const BROOM_SPEED = MAX_SPEED, BROOM_BOOST = BOOST;
 const ease = (k, dt) => 1 - Math.exp(-k * dt);
 
-export function createBroom({ camera, overlay, help, audio, groundAt, player, onCast, onMove }) {
+export function createBroom({ camera, help, audio, groundAt, player, onCast, onMove }) {
   const vel = new THREE.Vector3(), target = new THREE.Vector3();
   const dir = new THREE.Vector3(), side = new THREE.Vector3(), off = new THREE.Vector3(), tip = new THREE.Vector3();
   // Laufendes Manöver: Startrahmen d/r/u (vorne, rechts, oben), Bahnradius R, Versatz des letzten Bildes
@@ -138,7 +139,6 @@ export function createBroom({ camera, overlay, help, audio, groundAt, player, on
   }
 
   function show(on) {
-    if (overlay) { overlay.style.display = on ? 'block' : 'none'; overlay.style.transform = 'translateX(-50%)'; }
     if (help) { help.style.display = on ? 'block' : 'none'; help.style.opacity = '1'; }
   }
 
@@ -174,6 +174,8 @@ export function createBroom({ camera, overlay, help, audio, groundAt, player, on
     get spiralFov() { return (mv.on ? moveFov(mv.t / mv.dur) : 0) + (boosting ? 7 * Math.min(1, vel.length() / MAX_SPEED) : 0); },
     /** Läuft gerade ein Manöver? */
     get moving() { return mv.on; },
+    /** Name des laufenden Manövers ('' ohne). */
+    get move() { return mv.on ? mv.move : ''; },
     get boosting() { return boosting; },
     /** Steht man (fast) still in der Luft? */
     get hovering() { return hovering && !mv.on; },
@@ -311,13 +313,8 @@ export function createBroom({ camera, overlay, help, audio, groundAt, player, on
       }
 
       // Bild: Schwanken, Schweben, Rückstoß beim Zaubern und ein leichtes Zittern bei hoher Fahrt
-      const sf = Math.min(1, vel.length() / MAX_SPEED), jit = sf * sf * 2.2;
+      const sf = Math.min(1, vel.length() / MAX_SPEED);
       kick *= Math.exp(-14 * dt);
-      if (overlay) {
-        const x = swayX + (Math.random() - 0.5) * jit;
-        const y = swayY + Math.sin(bobT * 2.1) * 5 * still + kick * 10 + (Math.random() - 0.5) * jit;
-        overlay.style.transform = `translate(calc(-50% + ${x.toFixed(1)}px), ${y.toFixed(1)}px) rotate(${(bank * 5).toFixed(2)}deg)`;
-      }
       if (help && helpT > 0) {
         helpT -= dt;
         help.style.opacity = String(Math.max(0, Math.min(1, helpT)));
